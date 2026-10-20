@@ -27,6 +27,12 @@ export interface ScrollMessage {
   type: 'scroll';
   v: typeof SYNC_PROTOCOL_VERSION;
   tabId: number;
+  /** Browser window id (added by the service worker). */
+  windowId?: number;
+  /** Tab zoom factor (added by the service worker). */
+  zoom?: number;
+  /** False when the tab is in the background. */
+  visible: boolean;
   /** Stable key for the document: origin + path + query (no hash). */
   docKey: string;
   /** 'document' for the page itself, otherwise a CSS-path for the inner scroller. */
@@ -78,5 +84,5 @@ export type SyncMessage =
 
 /** Content script -> service worker (the worker adds tabId before forwarding). */
 export type ContentReport =
-  | Omit<ScrollMessage, 'tabId'>
+  | Omit<ScrollMessage, 'tabId' | 'windowId' | 'zoom'>
   | { type: 'navigate'; v: typeof SYNC_PROTOCOL_VERSION; docKey: string };

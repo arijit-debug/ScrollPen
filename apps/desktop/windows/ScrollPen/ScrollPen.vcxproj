@@ -83,7 +83,7 @@
       </AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>shell32.lib;user32.lib;windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>shell32.lib;user32.lib;windowsapp.lib;d3d11.lib;dxgi.lib;d2d1.lib;dwrite.lib;dcomp.lib;dwmapi.lib;shcore.lib;windowscodecs.lib;ws2_32.lib;bcrypt.lib;uiautomationcore.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
@@ -101,6 +101,7 @@
   <PropertyGroup Label="UserMacros" />
   <ItemGroup>
     <ClInclude Include="ScrollPen.h" />
+    <ClInclude Include="ScrollPenModule.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="AutolinkedNativeModules.g.h" />
     <ClInclude Include="pch.h" />
@@ -130,6 +131,9 @@
     <Import Project="$(ReactNativeWindowsDir)\PropertySheets\External\Microsoft.ReactNative.Composition.CppApp.targets" Condition="Exists('$(ReactNativeWindowsDir)\PropertySheets\External\Microsoft.ReactNative.Composition.CppApp.targets')" />
   </ImportGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ScrollPenEngine\ScrollPenEngine.vcxproj">
+      <Project>{2A65875F-52CA-42A6-AEAA-C95737271490}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Target Name="EnsureReactNativeWindowsTargets" BeforeTargets="PrepareForBuild">
     <PropertyGroup>

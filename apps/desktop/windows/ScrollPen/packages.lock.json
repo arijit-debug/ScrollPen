@@ -151,6 +151,9 @@
           "Microsoft.WindowsAppSDK.Foundation": "1.8.260505001",
           "Microsoft.WindowsAppSDK.InteractiveExperiences": "1.8.260430001"
         }
+      },
+      "scrollpenengine": {
+        "type": "Project"
       }
     },
     "native,Version=v0.0/win": {

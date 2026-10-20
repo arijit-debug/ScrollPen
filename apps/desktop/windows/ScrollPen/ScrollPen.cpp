@@ -7,6 +7,7 @@
 #include "AutolinkedNativeModules.g.h"
 
 #include "NativeModules.h"
+#include "ScrollPenModule.h"
 
 // A PackageProvider containing any turbo modules you define within this app project
 struct CompReactPackageProvider
@@ -18,7 +19,18 @@ struct CompReactPackageProvider
 };
 
 // The entry point of the Win32 application
-_Use_decl_annotations_ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE, PSTR /* commandLine */, int showCmd) {
+_Use_decl_annotations_ int CALLBACK WinMain(HINSTANCE /* instance */, HINSTANCE, PSTR /* commandLine */, int /* showCmd */) {
+  // One ScrollPen per user session: a second copy would fight over hotkeys and the sync port.
+  HANDLE singleInstance = CreateMutexW(nullptr, TRUE, L"Local\\ScrollPen.SingleInstance");
+  if (GetLastError() == ERROR_ALREADY_EXISTS) {
+    if (HWND existing = FindWindowW(L"ScrollPenController", nullptr)) {
+      DWORD pid = 0;
+      GetWindowThreadProcessId(existing, &pid);
+      AllowSetForegroundWindow(pid);
+    }
+    return 0;
+  }
+
   // Initialize WinRT
   winrt::init_apartment(winrt::apartment_type::single_threaded);
 
@@ -68,10 +80,24 @@ _Use_decl_annotations_ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE, PSTR 
   settings.UseDeveloperSupport(false);
 #endif
 
-  // Get the AppWindow so we can configure its initial title and size
+  // The app window is ScrollPen's floating dock: small, frameless, always on top.
   auto appWindow{reactNativeWin32App.AppWindow()};
   appWindow.Title(L"ScrollPen");
-  appWindow.Resize({1000, 1000});
+  appWindow.IsShownInSwitchers(true);
+  if (auto presenter = appWindow.Presenter().try_as<winrt::Microsoft::UI::Windowing::OverlappedPresenter>()) {
+    presenter.SetBorderAndTitleBar(true, false);
+    presenter.IsResizable(false);
+    presenter.IsMaximizable(false);
+    presenter.IsAlwaysOnTop(true);
+  }
+
+  HWND dock = winrt::Microsoft::UI::GetWindowFromWindowId(appWindow.Id());
+  ScrollPen::g_dockHwnd = dock;
+  const UINT dpi = GetDpiForWindow(dock);
+  RECT work{};
+  SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+  const int dockW = MulDiv(64, dpi, 96), dockH = MulDiv(640, dpi, 96);
+  appWindow.MoveAndResize({work.left + MulDiv(16, dpi, 96), work.top + (work.bottom - work.top - dockH) / 2, dockW, dockH});
 
   // Get the ReactViewOptions so we can set the initial RN component to load
   auto viewOptions{reactNativeWin32App.ReactViewOptions()};
@@ -79,4 +105,8 @@ _Use_decl_annotations_ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE, PSTR 
 
   // Start the app
   reactNativeWin32App.Start();
+
+  sp::Engine::Instance().Stop();
+  if (singleInstance) CloseHandle(singleInstance);
+  return 0;
 }

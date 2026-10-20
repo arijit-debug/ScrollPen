@@ -59,24 +59,40 @@ function emit(message: SyncMessage): void {
   void connect();
 }
 
+// Zoom per tab, so the app can convert the page's CSS pixels to screen pixels.
+const zoomByTab = new Map<number, number>();
+
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'scrollpen-content') return;
-  const tabId = port.sender?.tab?.id;
+  const tab = port.sender?.tab;
+  const tabId = tab?.id;
   if (tabId === undefined || port.sender?.frameId !== 0) return;
-  port.onMessage.addListener((report: ContentReport) => emit({ ...report, tabId }));
+  const windowId = tab?.windowId ?? -1;
+  if (!zoomByTab.has(tabId)) {
+    chrome.tabs.getZoom(tabId).then(
+      (z) => zoomByTab.set(tabId, z),
+      () => undefined,
+    );
+  }
+  port.onMessage.addListener((report: ContentReport) => {
+    if (report.type === 'scroll') emit({ ...report, tabId, windowId, zoom: zoomByTab.get(tabId) ?? 1 });
+    else emit({ ...report, tabId });
+  });
 });
 
 chrome.tabs.onActivated.addListener(({ tabId, windowId }) =>
   emit({ type: 'focus', v: SYNC_PROTOCOL_VERSION, tabId, windowId }),
 );
 
-chrome.tabs.onRemoved.addListener((tabId) =>
-  emit({ type: 'navigate', v: SYNC_PROTOCOL_VERSION, tabId, docKey: null }),
-);
+chrome.tabs.onRemoved.addListener((tabId) => {
+  zoomByTab.delete(tabId);
+  emit({ type: 'navigate', v: SYNC_PROTOCOL_VERSION, tabId, docKey: null });
+});
 
-chrome.tabs.onZoomChange.addListener(({ tabId, newZoomFactor }) =>
-  emit({ type: 'zoom', v: SYNC_PROTOCOL_VERSION, tabId, zoom: newZoomFactor }),
-);
+chrome.tabs.onZoomChange.addListener(({ tabId, newZoomFactor }) => {
+  zoomByTab.set(tabId, newZoomFactor);
+  emit({ type: 'zoom', v: SYNC_PROTOCOL_VERSION, tabId, zoom: newZoomFactor });
+});
 
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.port) socket?.close();

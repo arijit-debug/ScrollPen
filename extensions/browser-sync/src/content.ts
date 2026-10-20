@@ -38,7 +38,7 @@ function cssPath(el: Element): string {
   return parts.join('>');
 }
 
-function measure(target: Element | null): Omit<ScrollMessage, 'tabId'> {
+function measure(target: Element | null): Omit<ScrollMessage, 'tabId' | 'windowId' | 'zoom'> {
   const isDocument =
     !target || target === document.scrollingElement || target === document.documentElement || target === document.body;
   const vv = window.visualViewport;
@@ -46,6 +46,7 @@ function measure(target: Element | null): Omit<ScrollMessage, 'tabId'> {
     type: 'scroll' as const,
     v: SYNC_PROTOCOL_VERSION,
     docKey,
+    visible: document.visibilityState === 'visible',
     viewportWidth: vv?.width ?? window.innerWidth,
     viewportHeight: vv?.height ?? window.innerHeight,
     devicePixelRatio: window.devicePixelRatio,
