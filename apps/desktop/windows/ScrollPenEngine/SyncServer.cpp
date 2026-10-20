@@ -1,8 +1,13 @@
 #include "pch.h"
 #include "SyncServer.h"
 
+#include "LocalPeer.h"
+
+#include <iphlpapi.h>
+
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "bcrypt.lib")
+#pragma comment(lib, "iphlpapi.lib")
 
 namespace sp {
 
@@ -32,11 +37,34 @@ std::string Trim(const std::string &s) {
   return b == std::string::npos ? std::string{} : s.substr(b, e - b + 1);
 }
 
+constexpr ULONGLONG kHandshakeTimeoutMs = 5000;
+
 struct Client {
   SOCKET s{INVALID_SOCKET};
   bool upgraded{false};
   std::string in;
+  ULONGLONG acceptedAt{};
 };
+
+// The TCP peer must be chrome.exe in our own logon session: the Origin header is only
+// trustworthy from a browser, and loopback ports are shared by every user on the PC.
+bool PeerIsOwnChrome(SOCKET s) {
+  sockaddr_in peer{};
+  int len = sizeof(peer);
+  if (getpeername(s, reinterpret_cast<sockaddr *>(&peer), &len) != 0 || peer.sin_family != AF_INET) return false;
+  ULONG size = 0;
+  GetExtendedTcpTable(nullptr, &size, FALSE, AF_INET, TCP_TABLE_OWNER_PID_CONNECTIONS, 0);
+  std::vector<uint8_t> buf(size);
+  auto *table = reinterpret_cast<MIB_TCPTABLE_OWNER_PID *>(buf.data());
+  if (!size || GetExtendedTcpTable(table, &size, FALSE, AF_INET, TCP_TABLE_OWNER_PID_CONNECTIONS, 0) != NO_ERROR)
+    return false;
+  for (DWORD i = 0; i < table->dwNumEntries; ++i) {
+    const auto &row = table->table[i];
+    if (static_cast<USHORT>(row.dwLocalPort) == peer.sin_port && row.dwLocalAddr == peer.sin_addr.s_addr)
+      return peer::IsOwnProcess(row.dwOwningPid, L"chrome.exe", false);
+  }
+  return false;
+}
 
 bool SendAll(SOCKET s, const char *data, size_t n) {
   while (n > 0) {
@@ -89,7 +117,7 @@ bool SyncServer::OriginAllowed(const std::string &origin, const std::vector<std:
   if (!id.empty() && id.back() == '/') id.pop_back();
   if (id.size() != 32 || !std::all_of(id.begin(), id.end(), [](char c) { return c >= 'a' && c <= 'p'; }))
     return false;
-  return allowedIds.empty() || std::find(allowedIds.begin(), allowedIds.end(), id) != allowedIds.end();
+  return std::find(allowedIds.begin(), allowedIds.end(), id) != allowedIds.end();
 }
 
 bool SyncServer::HostAllowed(const std::string &host, unsigned short port) {
@@ -106,7 +134,10 @@ bool SyncServer::Start(Options options, std::function<void(const std::string &)>
   WSADATA wsa;
   if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return false;
   SOCKET ls = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  if (ls == INVALID_SOCKET) return false;
+  if (ls == INVALID_SOCKET) {
+    WSACleanup();
+    return false;
+  }
   // Refuse to share the port with another process (prevents port hijacking).
   BOOL exclusive = TRUE;
   setsockopt(ls, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char *>(&exclusive), sizeof(exclusive));
@@ -116,6 +147,7 @@ bool SyncServer::Start(Options options, std::function<void(const std::string &)>
   addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
   if (bind(ls, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == SOCKET_ERROR || listen(ls, 4) == SOCKET_ERROR) {
     closesocket(ls);
+    WSACleanup();
     return false;
   }
   u_long nb = 1;
@@ -156,6 +188,11 @@ void SyncServer::Run() {
   };
 
   while (!stop_) {
+    // A client that never finishes its handshake must not hold a slot forever.
+    const ULONGLONG now = GetTickCount64();
+    for (size_t i = clients.size(); i-- > 0;)
+      if (!clients[i].upgraded && now - clients[i].acceptedAt > kHandshakeTimeoutMs) drop(i);
+
     fd_set r;
     FD_ZERO(&r);
     FD_SET(ls, &r);
@@ -171,7 +208,7 @@ void SyncServer::Run() {
         } else {
           u_long nb = 1;
           ioctlsocket(s, FIONBIO, &nb);
-          clients.push_back({s, false, {}});
+          clients.push_back({s, false, {}, GetTickCount64()});
         }
       }
     }
@@ -211,7 +248,7 @@ void SyncServer::Run() {
           pos = eol + 2;
         }
         const bool ok = c.in.rfind("GET ", 0) == 0 && upgrade == "websocket" && !key.empty() &&
-            HostAllowed(host, options_.port) && OriginAllowed(origin, options_.allowedExtensionIds);
+            HostAllowed(host, options_.port) && OriginAllowed(origin, options_.allowedExtensionIds) && PeerIsOwnChrome(c.s);
         if (!ok) {
           static const char forbidden[] = "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
           SendAll(c.s, forbidden, sizeof(forbidden) - 1);

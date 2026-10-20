@@ -29,6 +29,8 @@ export interface EngineSettings {
   hideDockFromCapture: boolean;
   startActive: boolean;
   hotkeys: Record<string, string>;
+  /** Development/tests only: also accept the extension over ws://127.0.0.1:syncPort. */
+  devWebSocket: boolean;
   syncPort: number;
   allowedExtensionIds: string[];
 }

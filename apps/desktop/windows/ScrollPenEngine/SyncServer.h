@@ -9,16 +9,19 @@
 
 namespace sp {
 
-// Minimal RFC 6455 WebSocket server for the browser-sync extension.
+// Minimal RFC 6455 WebSocket server for the browser-sync extension: a development and test
+// transport, off unless the "devWebSocket" setting is on. Normal use goes through
+// PipeServer (Chrome native messaging).
 //
-// Security: binds 127.0.0.1 only; requires a chrome-extension:// Origin (optionally a
-// pinned extension id); requires a loopback Host header (blocks DNS rebinding); caps
-// frame size and client count; text frames only; never sends page data anywhere.
+// Security: binds 127.0.0.1 only; requires the Origin of an allowed extension id; requires a
+// loopback Host header (blocks DNS rebinding); the TCP peer must be chrome.exe in our logon
+// session; unfinished handshakes time out; caps frame size and client count; text frames
+// only; never sends page data anywhere.
 class SyncServer {
  public:
   struct Options {
     unsigned short port{47615};
-    std::vector<std::string> allowedExtensionIds; // empty = any chrome-extension:// origin
+    std::vector<std::string> allowedExtensionIds; // empty = none
     size_t maxMessageBytes{64 * 1024};
     size_t maxClients{8};
   };

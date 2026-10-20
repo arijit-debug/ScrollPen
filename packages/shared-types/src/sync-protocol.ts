@@ -1,12 +1,19 @@
 /**
- * Messages the browser-sync extension sends to the ScrollPen desktop app
- * over ws://127.0.0.1:<port>. Nothing here ever leaves the machine.
+ * Messages between the browser-sync extension and the ScrollPen desktop app. Nothing here
+ * ever leaves the machine.
+ *
+ * Normally they travel through Chrome native messaging: Chrome starts ScrollPen's helper
+ * (NATIVE_HOST_NAME, registered for the current Windows user only), which relays them over
+ * a named pipe that only that user can open; the helper and the app check each other's
+ * process. Tests and dev tools can instead point the extension at a WebSocket on
+ * ws://127.0.0.1:<port> (chrome.storage.local "port"), such as the mock host.
  */
 
 export const SYNC_PROTOCOL_VERSION = 1;
 export const SYNC_DEFAULT_PORT = 47615;
+export const NATIVE_HOST_NAME = 'com.scrollpen.sync';
 
-/** Sent once per WebSocket connection. */
+/** Sent once each time the app becomes reachable. */
 export interface HelloMessage {
   type: 'hello';
   v: typeof SYNC_PROTOCOL_VERSION;
@@ -105,7 +112,23 @@ export interface ProbeMessage {
   y: number;
 }
 
-export type HostMessage = ProbeMessage;
+/** App -> extension: reply to hello, so the extension knows the app itself is listening. */
+export interface WelcomeMessage {
+  type: 'welcome';
+  v: typeof SYNC_PROTOCOL_VERSION;
+}
+
+/**
+ * Native helper -> extension (never from the app): whether the helper currently has a
+ * verified pipe to the ScrollPen app.
+ */
+export interface HostStatusMessage {
+  type: 'host';
+  v: typeof SYNC_PROTOCOL_VERSION;
+  connected: boolean;
+}
+
+export type HostMessage = ProbeMessage | WelcomeMessage | HostStatusMessage;
 
 /** Content script -> service worker (the worker adds tabId before forwarding). */
 export type ContentReport =

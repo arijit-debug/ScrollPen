@@ -137,8 +137,8 @@ export function SettingsPanel({state, onClose}: {state: EngineState; onClose: ()
         <Text style={[styles.section, {color: theme.muted}]}>CHROME</Text>
         <Text style={[styles.hint, styles.para, {color: theme.muted}]}>
           {state.sync.serverRunning
-            ? `ScrollPen draws on Chrome pages; open images, PDFs and documents in Chrome to draw on them. Install the ScrollPen Browser Sync extension so ink follows scrolling exactly (listening on this PC only, 127.0.0.1:${s.syncPort}).`
-            : `Browser sync is off: port ${s.syncPort} is in use by another program.`}
+            ? 'ScrollPen draws on Chrome pages; open images, PDFs and documents in Chrome to draw on them. Install the ScrollPen Browser Sync extension so ink follows scrolling exactly (it talks only to ScrollPen, for your Windows account only).'
+            : "Browser sync is off: another program is holding ScrollPen's private link. Restart your PC, then ScrollPen."}
         </Text>
         <Text style={[styles.section, {color: theme.muted}]}>PRIVACY</Text>
         <Text style={[styles.hint, styles.para, {color: theme.muted}]}>

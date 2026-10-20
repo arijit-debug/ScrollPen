@@ -26,7 +26,8 @@ const common = {
   outdir: dist,
   bundle: true,
   target: 'chrome116',
-  sourcemap: 'linked',
+  // Source maps only while developing (--watch); release builds ship just the code.
+  sourcemap: watch ? 'linked' : false,
   logLevel: 'info',
 };
 const scripts = {

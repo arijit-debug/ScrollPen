@@ -20,3 +20,11 @@ tests/e2e-chrome/test-results/
 # Signing material never goes in git
 *.pfx
 *.p12
+
+# Installer output (scripts in apps/desktop/windows/installer)
+release/
+
+# Environment files (none are used; never commit one)
+.env
+.env.*
+.env*.local

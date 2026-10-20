@@ -3,6 +3,7 @@
 
 #include "InputHooks.h"
 #include "Model.h"
+#include "PipeServer.h"
 #include "Renderer.h"
 #include "ScrollTracker.h"
 #include "Settings.h"
@@ -203,9 +204,10 @@ class Engine::Impl {
     device_.Create();
     renderer_ = std::make_unique<Renderer>(device_);
     tracker_.SetWakeCallback([hwnd = controller_] { PostMessageW(hwnd, WM_APP_WAKE, 0, 0); });
-    tracker_.SetSendCallback([this](const std::string &message) { sync_.Broadcast(message); });
+    tracker_.SetSendCallback([this](const std::string &message) { SendToBrowser(message); });
     CreateOverlays();
     RegisterHotkeys();
+    StartBrowserLink();
     StartSyncServer();
     ApplyDockSettings();
     SetTimer(controller_, kTimerTrack, 250, nullptr);
@@ -227,6 +229,7 @@ class Engine::Impl {
 
     hooks_.Stop();
     sync_.Stop();
+    pipe_.Stop();
     for (auto &o : overlays_) DestroyWindow(o.hwnd);
     overlays_.clear();
     CoUninitialize();
@@ -260,7 +263,15 @@ class Engine::Impl {
         std::unique_ptr<std::string> s(reinterpret_cast<std::string *>(lp));
         auto j = json::parse(*s, nullptr, false);
         if (!j.is_discarded()) {
-          tracker_.OnBrowserMessage(j);
+          try {
+            // Malformed messages are dropped by the tracker's validation; a stray type
+            // error must never take the app down either.
+            tracker_.OnBrowserMessage(j);
+          } catch (const json::exception &) {
+            return 0;
+          }
+          if (j.is_object() && j.value("type", json{}) == "hello")
+            SendToBrowser(json{{"type", "welcome"}, {"v", 1}}.dump());
           // Present right away: waiting for an idle queue can skip frames while the
           // page scrolls, which makes ink trail the content.
           if (tracker_.Update(model_)) {
@@ -1172,15 +1183,32 @@ class Engine::Impl {
 
   // ---- sync server -------------------------------------------------------------------
 
+  // Hands a message from the extension to the engine thread.
+  static void PostSync(HWND controller, const std::string &m) {
+    auto *copy = new std::string(m);
+    if (!PostMessageW(controller, WM_APP_SYNC, 0, reinterpret_cast<LPARAM>(copy))) delete copy; // queue full
+  }
+
+  // Chrome native messaging (ScrollPenHost.exe) reaches the app through this pipe.
+  void StartBrowserLink() {
+    const HWND controller = controller_;
+    pipeRunning_ = pipe_.Start({}, [controller](const std::string &m) { PostSync(controller, m); });
+  }
+
+  // Development/tests only: the same messages over ws://127.0.0.1:syncPort.
   void StartSyncServer() {
     sync_.Stop();
+    if (!settings_.devWebSocket) return;
     SyncServer::Options opts;
     opts.port = settings_.syncPort;
     opts.allowedExtensionIds = settings_.allowedExtensionIds;
     const HWND controller = controller_;
-    syncRunning_ = sync_.Start(opts, [controller](const std::string &m) {
-      PostMessageW(controller, WM_APP_SYNC, 0, reinterpret_cast<LPARAM>(new std::string(m)));
-    });
+    sync_.Start(opts, [controller](const std::string &m) { PostSync(controller, m); });
+  }
+
+  void SendToBrowser(const std::string &message) {
+    pipe_.Broadcast(message);
+    sync_.Broadcast(message);
   }
 
   // ---- commands from JS --------------------------------------------------------------
@@ -1279,6 +1307,7 @@ class Engine::Impl {
     else if (cmd == "screenshot") Screenshot();
     else if (cmd == "updateSettings" && j.contains("settings")) {
       const auto oldPort = settings_.syncPort;
+      const auto oldDev = settings_.devWebSocket;
       const auto oldIds = settings_.allowedExtensionIds;
       const auto oldHotkeys = settings_.hotkeys;
       settings_.Merge(j["settings"]);
@@ -1286,7 +1315,8 @@ class Engine::Impl {
       live_.laserFadeSeconds = settings_.laserFadeSeconds;
       holdVk_ = ParseKeyName(settings_.clickThroughKey);
       if (oldHotkeys != settings_.hotkeys) RegisterHotkeys();
-      if (oldPort != settings_.syncPort || oldIds != settings_.allowedExtensionIds) StartSyncServer();
+      if (oldDev != settings_.devWebSocket || oldPort != settings_.syncPort || oldIds != settings_.allowedExtensionIds)
+        StartSyncServer();
       ApplyDockSettings();
       SaveSettings();
       Invalidate();
@@ -1446,7 +1476,7 @@ class Engine::Impl {
         {"canUndo", model_.CanUndo() || live_.text.has_value()},
         {"canRedo", model_.CanRedo()},
         {"itemCount", model_.ItemCount()},
-        {"sync", {{"source", lastSyncSource_}, {"confidence", tracker_.ActiveConfidence()}, {"serverRunning", syncRunning_}}},        {"hotkeyErrors", hotkeyErrors_},
+        {"sync", {{"source", lastSyncSource_}, {"confidence", tracker_.ActiveConfidence()}, {"serverRunning", pipeRunning_}}},        {"hotkeyErrors", hotkeyErrors_},
         {"hookReinstalls", hooks_.ReinstallCount()},
         {"monitors", overlays_.size()},
         {"settings", settings_.ToJson()},
@@ -1497,8 +1527,9 @@ class Engine::Impl {
   bool swallowed_[256]{}; // hook thread only
 
   InputHooks hooks_;
-  SyncServer sync_;
-  bool syncRunning_{false};
+  PipeServer pipe_;
+  bool pipeRunning_{false};
+  SyncServer sync_; // dev/tests only
   std::map<int, std::string> hotkeyIds_;
   std::vector<std::string> hotkeyErrors_;
 };

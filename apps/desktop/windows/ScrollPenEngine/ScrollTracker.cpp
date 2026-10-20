@@ -25,6 +25,49 @@ const char *SyncSourceName(SyncSource s) {
 
 namespace {
 
+constexpr size_t kMaxTabs = 512;
+constexpr size_t kMaxScrollersPerTab = 64;
+
+// Schema check for a message from the extension. Field types and sizes must match
+// sync-protocol.ts exactly; anything else is dropped before it is read.
+bool ValidBrowserMessage(const json &m) {
+  if (!m.is_object() || !m.contains("v") || !m["v"].is_number_integer() || m["v"].get<int64_t>() != 1) return false;
+  if (!m.contains("type") || !m["type"].is_string()) return false;
+  auto has = [&](const char *k) { return m.contains(k); };
+  auto integer = [&](const char *k, bool required) {
+    if (!has(k)) return !required;
+    const auto &v = m[k];
+    return v.is_number_integer() && v.get<int64_t>() >= INT32_MIN && v.get<int64_t>() <= INT32_MAX;
+  };
+  auto number = [&](const json &v) { return v.is_number() && std::isfinite(v.get<double>()); };
+  auto num = [&](const char *k) { return !has(k) || number(m[k]); };
+  auto str = [&](const char *k, size_t maxLen, bool required) {
+    if (!has(k)) return !required;
+    return m[k].is_string() && m[k].get_ref<const std::string &>().size() <= maxLen;
+  };
+  auto boolean = [&](const char *k) { return !has(k) || m[k].is_boolean(); };
+
+  const std::string &type = m["type"].get_ref<const std::string &>();
+  if (type == "hello") return str("extVersion", 64, false) && str("userAgent", 1024, false);
+  if (type == "focus") return integer("tabId", true) && integer("windowId", true);
+  if (type == "zoom") return integer("tabId", true) && has("zoom") && number(m["zoom"]);
+  if (type == "navigate") return integer("tabId", true) && has("docKey") && (m["docKey"].is_null() || str("docKey", 8192, true));
+  if (type != "scroll") return false;
+  if (!integer("tabId", true) || !integer("windowId", false) || !str("docKey", 8192, true) ||
+      !str("scroller", 2048, false) || !str("title", 4096, false) || !boolean("visible"))
+    return false;
+  for (const char *k : {"zoom", "devicePixelRatio", "viewportWidth", "viewportHeight", "screenX", "screenY", "scrollX",
+                        "scrollY", "scrollWidth", "scrollHeight", "contentScale", "ts"})
+    if (!num(k)) return false;
+  if (has("scrollerRect")) {
+    const auto &r = m["scrollerRect"];
+    if (!r.is_object()) return false;
+    for (const char *k : {"x", "y", "width", "height"})
+      if (r.contains(k) && !number(r[k])) return false;
+  }
+  return true;
+}
+
 double Now() {
   using namespace std::chrono;
   return duration<double>(steady_clock::now().time_since_epoch()).count();
@@ -391,12 +434,15 @@ ScrollTracker::ScrollTracker() {
 ScrollTracker::~ScrollTracker() = default;
 
 void ScrollTracker::OnBrowserMessage(const json &msg) {
-  if (!msg.is_object() || msg.value("v", 0) != 1) return;
+  if (!ValidBrowserMessage(msg)) return;
   const std::string type = msg.value("type", "");
   const int tabId = msg.value("tabId", -1);
   const double now = Now();
+  // Bounded state, however many tabs or scrollers a sender invents.
+  if (tabId >= 0 && !tabs_.count(tabId) && tabs_.size() >= kMaxTabs) return;
 
   if (type == "focus") {
+    if (!activeTabByWindow_.count(msg.value("windowId", -1)) && activeTabByWindow_.size() >= kMaxTabs) return;
     activeTabByWindow_[msg.value("windowId", -1)] = tabId;
     if (auto it = tabs_.find(tabId); it != tabs_.end()) it->second.windowId = msg.value("windowId", -1);
     return;
@@ -425,7 +471,8 @@ void ScrollTracker::OnBrowserMessage(const json &msg) {
   if (msg.contains("windowId")) {
     t.windowId = msg.value("windowId", -1);
     // The tab producing scroll events is the visible one in its window.
-    if (msg.value("visible", true)) activeTabByWindow_[t.windowId] = tabId;
+    if (msg.value("visible", true) && (activeTabByWindow_.count(t.windowId) || activeTabByWindow_.size() < kMaxTabs))
+      activeTabByWindow_[t.windowId] = tabId;
   }
   if (msg.contains("zoom")) t.zoom = msg.value("zoom", 1.0);
   t.dpr = std::max(0.25, msg.value("devicePixelRatio", 1.0));
@@ -435,7 +482,9 @@ void ScrollTracker::OnBrowserMessage(const json &msg) {
   t.screenY = msg.value("screenY", 0.0);
   if (msg.contains("title") && msg["title"].is_string()) t.title = Widen(msg["title"].get<std::string>());
   t.lastSeen = now;
-  auto &s = t.scrollers[msg.value("scroller", "document")];
+  const std::string scroller = msg.value("scroller", "document");
+  if (!t.scrollers.count(scroller) && t.scrollers.size() >= kMaxScrollersPerTab) return;
+  auto &s = t.scrollers[scroller];
   s.x = msg.value("scrollX", 0.0);
   s.y = msg.value("scrollY", 0.0);
   if (msg.contains("scrollerRect")) {

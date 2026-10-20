@@ -79,8 +79,10 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="Engine.h" />
     <ClInclude Include="InputHooks.h" />
+    <ClInclude Include="LocalPeer.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="OpticalFlow.h" />
+    <ClInclude Include="PipeServer.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="ScrollTracker.h" />
     <ClInclude Include="Settings.h" />
@@ -95,6 +97,7 @@
     <ClCompile Include="InputHooks.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="OpticalFlow.cpp" />
+    <ClCompile Include="PipeServer.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="ScrollTracker.cpp" />
     <ClCompile Include="Settings.cpp" />

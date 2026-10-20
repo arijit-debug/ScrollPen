@@ -83,7 +83,7 @@
       </AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>shell32.lib;user32.lib;windowsapp.lib;d3d11.lib;dxgi.lib;d2d1.lib;dwrite.lib;dcomp.lib;dwmapi.lib;shcore.lib;windowscodecs.lib;ws2_32.lib;bcrypt.lib;uiautomationcore.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>shell32.lib;user32.lib;windowsapp.lib;d3d11.lib;dxgi.lib;d2d1.lib;dwrite.lib;dcomp.lib;dwmapi.lib;shcore.lib;windowscodecs.lib;ws2_32.lib;bcrypt.lib;iphlpapi.lib;advapi32.lib;uiautomationcore.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>

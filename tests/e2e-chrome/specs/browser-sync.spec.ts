@@ -1,4 +1,5 @@
 import { test, expect } from '../support/fixtures';
+import { EXTENSION_ID } from '../support/mock-host.mjs';
 
 // Gate for Phase 0: the extension's reported offset must match the page exactly,
 // because the desktop app draws ink at (anchor - scrollY).
@@ -7,6 +8,15 @@ test('says hello with the extension version', async ({ host }) => {
   const hello = await host.waitFor((m) => m.type === 'hello');
   expect(hello.v).toBe(1);
   expect(hello.extVersion).toMatch(/^\d+\.\d+\.\d+$/);
+});
+
+test('has the pinned extension ID and confirms the app answered', async ({ serviceWorker, host }) => {
+  // The app and the native helper accept only this ID (fixed by the manifest "key").
+  expect(new URL(serviceWorker.url()).host).toBe(EXTENSION_ID);
+  await host.waitFor((m) => m.type === 'hello');
+  await expect
+    .poll(() => serviceWorker.evaluate(() => (globalThis as { scrollpenLink?: () => object }).scrollpenLink?.()))
+    .toEqual({ transport: 'websocket', ready: true, welcomed: true });
 });
 
 test('reports the document on load', async ({ context, host, site }) => {

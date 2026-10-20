@@ -24,4 +24,10 @@
     <ReactExperimentalFeaturesSet>true</ReactExperimentalFeaturesSet>
   </PropertyGroup>
 
+  <PropertyGroup Label="ScrollPen offline builds">
+    <!-- The React Native Windows CLI sends usage telemetry by default; ScrollPen stays offline, builds included. -->
+    <AutolinkCommand>npx --yes @react-native-community/cli autolink-windows --no-telemetry</AutolinkCommand>
+    <CodegenCommand>npx --yes @react-native-community/cli codegen-windows --no-telemetry</CodegenCommand>
+  </PropertyGroup>
+
 </Project>

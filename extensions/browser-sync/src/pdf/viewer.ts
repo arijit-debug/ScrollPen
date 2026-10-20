@@ -113,8 +113,11 @@ async function main(): Promise<void> {
   startReporter(`pdf:${source}`);
 
   pdfjs.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf/pdf.worker.min.mjs');
+  // The PDF is untrusted and this page can read any site and local files: only pages are
+  // drawn (no pdf.js scripting or XFA forms), and the extension CSP forbids eval.
   const doc = await pdfjs.getDocument({
     data: await load(source),
+    enableXfa: false,
     cMapUrl: chrome.runtime.getURL('pdf/cmaps/'),
     cMapPacked: true,
     standardFontDataUrl: chrome.runtime.getURL('pdf/standard_fonts/'),

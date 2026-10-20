@@ -5,8 +5,8 @@
   "description": "ScrollPen for Windows (React Native for Windows app)",
   "scripts": {
     "start": "react-native start",
-    "windows": "npx @react-native-community/cli run-windows",
-    "windows:release": "npx @react-native-community/cli run-windows --release",
+    "windows": "npx @react-native-community/cli run-windows --no-telemetry",
+    "windows:release": "npx @react-native-community/cli run-windows --release --no-telemetry",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest"
@@ -29,6 +29,7 @@
     "@types/jest": "^29.5.13",
     "@types/react": "^19.2.0",
     "@types/react-test-renderer": "^19.1.0",
+    "braces": "file:./patches/braces",
     "eslint": "^8.19.0",
     "jest": "^29.6.3",
     "prettier": "2.8.8",
@@ -44,5 +45,13 @@
       "namespace": "ScrollPen",
       "template": "cpp-app"
     }
+  },
+  "overrides": {
+    "@xmldom/xmldom": "^0.9.12",
+    "fast-xml-parser": "^5.11.2",
+    "@istanbuljs/load-nyc-config": {
+      "js-yaml": "^4.1.0"
+    },
+    "braces": "$braces"
   }
 }

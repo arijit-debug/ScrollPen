@@ -35,6 +35,7 @@ export const defaultState: EngineState = {
     hideDockFromCapture: true,
     startActive: false,
     hotkeys: {},
+    devWebSocket: false,
     syncPort: 47615,
     allowedExtensionIds: [],
   },

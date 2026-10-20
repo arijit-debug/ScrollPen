@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@scrollpen/shared-types": "*",
-    "pdfjs-dist": "^5.7.284"
+    "pdfjs-dist": "^6.4.299"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.300",

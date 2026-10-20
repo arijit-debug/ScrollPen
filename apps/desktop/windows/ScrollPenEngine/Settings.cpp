@@ -109,6 +109,7 @@ nlohmann::json Settings::ToJson() const {
       {"hideDockFromCapture", hideDockFromCapture},
       {"startActive", startActive},
       {"hotkeys", hotkeys},
+      {"devWebSocket", devWebSocket},
       {"syncPort", syncPort},
       {"allowedExtensionIds", allowedExtensionIds},
   };
@@ -150,6 +151,7 @@ void Settings::Merge(const nlohmann::json &j) {
     if (k.empty() || ParseKeyName(k)) clickThroughKey = k;
   }
   flag("hideDockFromCapture", hideDockFromCapture);
+  flag("devWebSocket", devWebSocket);
   flag("startActive", startActive);
   if (j.contains("hotkeys") && j["hotkeys"].is_object()) {
     for (auto &[name, value] : j["hotkeys"].items()) {
@@ -169,7 +171,7 @@ void Settings::Merge(const nlohmann::json &j) {
       const auto s = id.get<std::string>();
       if (s.size() == 32 && std::all_of(s.begin(), s.end(), [](char c) { return c >= 'a' && c <= 'p'; })) ids.push_back(s);
     }
-    allowedExtensionIds = ids;
+    allowedExtensionIds = ids.empty() ? std::vector<std::string>{peer::kExtensionId} : ids;
   }
 }
 

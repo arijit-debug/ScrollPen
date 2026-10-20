@@ -1,6 +1,10 @@
-// Stand-in for the ScrollPen desktop app's sync server. Used by the Playwright
-// tests and, via `npm run mock-host`, for manual testing in real Chrome.
+// Stand-in for the ScrollPen desktop app's dev WebSocket (the app's "devWebSocket" setting).
+// Used by the Playwright tests and, via `npm run mock-host`, for manual testing in real
+// Chrome (set chrome.storage.local "port" in the extension's service worker console).
 import { WebSocketServer } from 'ws';
+
+/** The extension's fixed ID (from the "key" in its manifest); the app accepts only this one. */
+export const EXTENSION_ID = 'egihgjpnabmnoljofdkeakgplgjeidai';
 
 /**
  * @param {number} port 0 picks a free port.
@@ -13,9 +17,9 @@ export async function startMockHost(port = 0, opts = {}) {
   const wss = new WebSocketServer({
     host: '127.0.0.1',
     port,
-    // Same rule the real app will enforce: only Chrome/Edge extensions may connect,
-    // so an ordinary web page can't talk to ScrollPen.
-    verifyClient: ({ origin }) => (origin ?? '').startsWith('chrome-extension://'),
+    // Same rule as the app: only the ScrollPen extension may connect, so neither an
+    // ordinary web page nor another extension can talk to ScrollPen.
+    verifyClient: ({ origin }) => origin === `chrome-extension://${EXTENSION_ID}`,
   });
   await new Promise((resolve) => wss.once('listening', resolve));
 
@@ -23,6 +27,7 @@ export async function startMockHost(port = 0, opts = {}) {
     ws.on('message', (raw) => {
       const msg = JSON.parse(String(raw));
       if (msg.type === 'ping') return;
+      if (msg.type === 'hello') ws.send(JSON.stringify({ type: 'welcome', v: 1 }));
       messages.push(msg);
       if (opts.log) console.log(JSON.stringify(msg));
       for (const w of waiters) {

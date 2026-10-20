@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "LocalPeer.h"
 #include "third_party/nlohmann/json.hpp"
 
 namespace sp {
@@ -48,9 +49,12 @@ struct Settings {
       {"toggleMode", "Ctrl+Shift+M"},
   };
 
-  // Browser sync
+  // Browser sync. The extension normally reaches the app through Chrome native messaging
+  // (PipeServer); the WebSocket on 127.0.0.1:syncPort is for development and tests only.
+  bool devWebSocket{false};
   unsigned short syncPort{47615};
-  std::vector<std::string> allowedExtensionIds; // empty = any extension (dev builds)
+  // Extensions the dev WebSocket accepts. Never empty: there is no "any extension" mode.
+  std::vector<std::string> allowedExtensionIds{peer::kExtensionId};
 
   nlohmann::json ToJson() const;
   // Applies known fields from j, validating ranges; unknown/invalid fields are ignored.
