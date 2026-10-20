@@ -1,0 +1,19 @@
+{
+  "name": "@scrollpen/e2e-chrome",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Chrome tests for the browser-sync extension (Playwright Chromium + mock ScrollPen host)",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "sandbox": "node sandbox.mjs",
+    "mock-host": "node support/mock-host.mjs 47615"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@scrollpen/shared-types": "*",
+    "@types/chrome": "^0.0.300",
+    "@types/node": "^22.0.0",
+    "ws": "^8.18.0"
+  }
+}

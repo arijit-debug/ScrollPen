@@ -1,0 +1,22 @@
+node_modules/
+dist/
+*.log
+
+# Visual Studio / MSBuild
+.vs/
+*.user
+[Bb]in/
+[Oo]bj/
+x64/
+ARM64/
+AppPackages/
+BundleArtifacts/
+*.ProjectImports.zip
+
+# Playwright
+tests/e2e-chrome/report/
+tests/e2e-chrome/test-results/
+
+# Signing material never goes in git
+*.pfx
+*.p12

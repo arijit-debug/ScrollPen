@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  js:
+    name: Extension + Chrome tests + app unit tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium
+      - run: npm run typecheck -w @scrollpen/browser-sync
+      - run: npm run test:chrome
+      - run: npm ci --prefix apps/desktop
+      - run: npm run typecheck --prefix apps/desktop
+      - run: npm run app:test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: tests/e2e-chrome/report
+  # Native (MSBuild) job is added once the hosted runners ship Visual Studio 2026,
+  # which React Native for Windows 0.84 requires.

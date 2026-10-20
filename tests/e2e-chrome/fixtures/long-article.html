@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ScrollPen fixture: long article</title>
+<style>
+  :root { color-scheme: light dark; --rule: #d33; }
+  body { margin: 0; font: 18px/1.6 Georgia, serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+  /* Every ruler sits at an exact multiple of 500px from the top of the document,
+     so a screenshot or a human can check how far ink has drifted. */
+  .ruler { position: absolute; left: 0; right: 0; height: 0; border-top: 2px solid var(--rule); }
+  .ruler span { position: absolute; left: 8px; top: -1.4em; font: 12px/1 ui-monospace, monospace; color: var(--rule); }
+  p { margin: 0 0 1em; }
+</style>
+</head>
+<body>
+<main id="content"></main>
+<script>
+  const HEIGHT = 20000;
+  document.body.style.position = 'relative';
+  document.body.style.minHeight = HEIGHT + 'px';
+  for (let y = 0; y <= HEIGHT; y += 500) {
+    const r = document.createElement('div');
+    r.className = 'ruler';
+    r.style.top = y + 'px';
+    r.innerHTML = '<span>y = ' + y + 'px</span>';
+    document.body.appendChild(r);
+  }
+  const words = 'ink scroll page anchor stroke pen document overlay margin note sync window line text reading'.split(' ');
+  const main = document.getElementById('content');
+  for (let i = 0; i < 160; i++) {
+    const p = document.createElement('p');
+    let s = '';
+    for (let w = 0; w < 60; w++) s += words[(i * 7 + w * 3) % words.length] + ' ';
+    p.textContent = (i + 1) + '. ' + s;
+    main.appendChild(p);
+  }
+</script>
+</body>
+</html>

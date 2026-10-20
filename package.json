@@ -1,0 +1,25 @@
+{
+  "name": "scrollpen",
+  "version": "0.0.1",
+  "private": true,
+  "description": "ScrollPen: a Windows screen pen whose ink can follow scrolling content",
+  "workspaces": [
+    "packages/*",
+    "extensions/*",
+    "tests/*"
+  ],
+  "scripts": {
+    "ext:build": "npm run build -w @scrollpen/browser-sync",
+    "ext:watch": "npm run watch -w @scrollpen/browser-sync",
+    "test:chrome": "npm run ext:build && npm test -w @scrollpen/e2e-chrome",
+    "chrome:sandbox": "npm run ext:build && npm run sandbox -w @scrollpen/e2e-chrome",
+    "mock-host": "npm run mock-host -w @scrollpen/e2e-chrome",
+    "app:install": "npm install --prefix apps/desktop",
+    "app:test": "npm test --prefix apps/desktop",
+    "app:windows": "npm run windows --prefix apps/desktop",
+    "typecheck": "npm run typecheck -w @scrollpen/browser-sync && npm run typecheck --prefix apps/desktop"
+  },
+  "engines": {
+    "node": ">= 22.11.0"
+  }
+}

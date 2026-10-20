@@ -1,0 +1,8 @@
+{
+  "name": "@scrollpen/shared-types",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Types shared by the ScrollPen desktop app and browser extension",
+  "types": "src/sync-protocol.ts",
+  "main": "src/sync-protocol.ts"
+}

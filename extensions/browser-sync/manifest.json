@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "ScrollPen Browser Sync",
+  "version": "0.0.1",
+  "description": "Lets ScrollPen keep your on-screen ink attached to the page as you scroll. Talks only to the ScrollPen app on this PC.",
+  "minimum_chrome_version": "116",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*", "file:///*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}
