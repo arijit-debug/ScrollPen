@@ -37,6 +37,28 @@ std::string Hex(uintptr_t v) {
 }
 
 constexpr double kActiveWindowSeconds = 0.8; // track at full rate this long after activity
+// Poll intervals for slots whose layer has ink. UIA reads are cheap; an optical capture is
+// a PrintWindow, so it idles slower and speeds up once it sees motion.
+constexpr double kUiaInterval = 1.0 / 60;
+constexpr double kOpticalActiveInterval = 1.0 / 30;
+constexpr double kOpticalIdleInterval = 0.1;
+// A browser layer keeps its last matched tab this long while the window is mid-resize and
+// the extension hasn't reported the new viewport size yet.
+constexpr double kTabMatchGraceSeconds = 1.5;
+// Scroller key the extension uses for the picture in an image tab (see reporter.ts).
+constexpr char kImageScroller[] = "image";
+
+bool SameViewport(const Viewport &a, const Viewport &b) {
+  auto sameRect = [](const RectF &x, const RectF &y) {
+    return x.left == y.left && x.top == y.top && x.right == y.right && x.bottom == y.bottom;
+  };
+  if (a.visible != b.visible || a.scrollX != b.scrollX || a.scrollY != b.scrollY || a.scale != b.scale ||
+      !sameRect(a.screenRect, b.screenRect) || !sameRect(a.clipArea, b.clipArea) || a.clip.size() != b.clip.size())
+    return false;
+  for (size_t i = 0; i < a.clip.size(); ++i)
+    if (!sameRect(a.clip[i], b.clip[i])) return false;
+  return true;
+}
 
 } // namespace
 
@@ -55,6 +77,9 @@ struct ScrollTracker::WorkerSlot {
   float confidence{0};
   bool alive{true};
   uint64_t version{0};
+  // Worker thread only.
+  bool wanted{false}; // its layer has ink, so keep it current
+  double nextPoll{0};
 };
 
 class ScrollTracker::Worker {
@@ -118,6 +143,17 @@ class ScrollTracker::Worker {
     if (slot >= 0 && slot < static_cast<int>(slots_.size())) slots_[slot]->scrollY += dy;
   }
 
+  // Slots whose layers currently have ink; only these are polled.
+  void SetDemand(std::vector<int> slots) {
+    std::sort(slots.begin(), slots.end());
+    {
+      std::lock_guard lock(mutex_);
+      if (slots == demand_) return;
+      demand_ = std::move(slots);
+    }
+    cv_.notify_all();
+  }
+
  private:
   struct Request {
     POINT pt;
@@ -161,14 +197,26 @@ class ScrollTracker::Worker {
         continue;
       }
 
-      const bool active = Now() - lastActivity_ < kActiveWindowSeconds;
-      // Poll every live slot. 30 Hz while the user is scrolling, 2 Hz otherwise.
-      std::vector<WorkerSlot *> live;
-      for (auto &s : slots_)
-        if (s->alive) live.push_back(s.get());
+      // Poll slots with ink on their own schedule. Without input hooks (cursor mode) there
+      // is no wheel signal, so polling is what keeps ink following the content.
+      double now = Now();
+      std::vector<WorkerSlot *> due;
+      for (size_t i = 0; i < slots_.size(); ++i) {
+        auto &s = *slots_[i];
+        s.wanted = s.alive && std::binary_search(demand_.begin(), demand_.end(), static_cast<int>(i));
+        if (s.wanted && now >= s.nextPoll) due.push_back(&s);
+      }
       lock.unlock();
       bool changed = false;
-      for (auto *s : live) changed |= Poll(*s, active);
+      for (auto *s : due) {
+        const bool moved = Poll(*s);
+        if (moved) lastActivity_ = Now(); // content is moving: keep sampling fast
+        changed |= moved;
+        const bool fast = Now() - lastActivity_ < kActiveWindowSeconds;
+        s->nextPoll = Now() + (s->source == SyncSource::Uia ? kUiaInterval
+                               : fast                         ? kOpticalActiveInterval
+                                                              : kOpticalIdleInterval);
+      }
       lock.lock();
       if (changed && wake_) {
         auto w = wake_;
@@ -176,8 +224,12 @@ class ScrollTracker::Worker {
         w();
         lock.lock();
       }
-      cv_.wait_for(lock, std::chrono::milliseconds(active ? 33 : 500),
-                   [&] { return stop_ || !requests_.empty(); });
+      now = Now();
+      double wait = 0.5;
+      for (auto &s : slots_)
+        if (s->wanted) wait = std::min(wait, s->nextPoll - now);
+      wait = std::clamp(wait, 0.004, 0.5);
+      cv_.wait_for(lock, std::chrono::duration<double>(wait), [&] { return stop_ || !requests_.empty(); });
     }
     lock.unlock();
     slots_.clear();
@@ -283,8 +335,7 @@ class ScrollTracker::Worker {
     return changed;
   }
 
-  bool PollOptical(WorkerSlot &s, bool active) {
-    if (!active) return false; // optical only runs while the user is scrolling
+  bool PollOptical(WorkerSlot &s) {
     if (!IsWindow(s.captureHwnd)) {
       std::lock_guard lock(mutex_);
       s.alive = false;
@@ -306,13 +357,15 @@ class ScrollTracker::Worker {
     return changed;
   }
 
-  bool Poll(WorkerSlot &s, bool active) {
+  bool Poll(WorkerSlot &s) {
     if (!IsWindow(s.hwnd)) {
       std::lock_guard lock(mutex_);
       s.alive = false;
       return true;
     }
-    return s.source == SyncSource::Uia ? PollUia(s) : PollOptical(s, active);
+    // A minimized window has nothing to measure; skip it rather than read stale content.
+    if (IsIconic(s.hwnd)) return false;
+    return s.source == SyncSource::Uia ? PollUia(s) : PollOptical(s);
   }
 
   std::mutex mutex_;
@@ -321,6 +374,7 @@ class ScrollTracker::Worker {
   bool stop_{false};
   std::vector<std::shared_ptr<Request>> requests_;
   std::vector<std::unique_ptr<WorkerSlot>> slots_;
+  std::vector<int> demand_; // sorted slot indices
   std::atomic<double> lastActivity_{0};
   std::function<void()> wake_;
   ComPtr<IUIAutomation> uia_;
@@ -379,6 +433,7 @@ void ScrollTracker::OnBrowserMessage(const json &msg) {
   t.viewportH = msg.value("viewportHeight", 0.0);
   t.screenX = msg.value("screenX", 0.0);
   t.screenY = msg.value("screenY", 0.0);
+  if (msg.contains("title") && msg["title"].is_string()) t.title = Widen(msg["title"].get<std::string>());
   t.lastSeen = now;
   auto &s = t.scrollers[msg.value("scroller", "document")];
   s.x = msg.value("scrollX", 0.0);
@@ -388,25 +443,43 @@ void ScrollTracker::OnBrowserMessage(const json &msg) {
     s.rectCss = {r.value("x", 0.0f), r.value("y", 0.0f), r.value("x", 0.0f) + r.value("width", 0.0f),
                  r.value("y", 0.0f) + r.value("height", 0.0f)};
   }
+  s.contentScale = std::max(0.001, msg.value("contentScale", 1.0));
 }
 
-std::optional<int> ScrollTracker::ActiveTabFor(HWND hwnd, const RECT &vp) {
-  (void)hwnd;
-  const double w = vp.right - vp.left, h = vp.bottom - vp.top;
-  // Among windows of the same size, the reported screen position decides. It is only
-  // approximate (browser chrome is estimated), so it's a tie-breaker, not a filter.
+// Chrome lays out its tab strip and toolbar above the page and any side panel or docked
+// DevTools beside it, so the page is the bottom-left part of the window frame, sized like
+// the tab's viewport. (The page's own child window, "Chrome Legacy Window", is usually
+// hidden or left at a stale position in Chrome, so it can't be used.)
+std::optional<RECT> ScrollTracker::PageRect(HWND hwnd, const TabState &t) {
+  const RECT f = VisibleFrame(hwnd);
+  const LONG w = std::lround(t.viewportW * t.dpr), h = std::lround(t.viewportH * t.dpr);
+  if (w <= 0 || h <= 0 || w > f.right - f.left + 8 || h > f.bottom - f.top + 8) return std::nullopt;
+  return RECT{f.left, f.bottom - h, f.left + w, f.bottom};
+}
+
+std::optional<int> ScrollTracker::ActiveTabFor(HWND hwnd) {
+  // Chrome titles each window "<active tab's title> - Google Chrome": a tab whose title
+  // doesn't start the window's title isn't the one this window shows.
+  const std::wstring windowTitle = CurrentTitle(hwnd);
+  const double now = Now();
   std::optional<int> best;
   double bestScore = 1e18;
   for (const auto &[windowId, tabId] : activeTabByWindow_) {
     auto it = tabs_.find(tabId);
     if (it == tabs_.end() || it->second.docKey.empty()) continue;
     const auto &t = it->second;
-    // The page viewport in physical px must match the browser's content window.
-    const double dw = std::abs(t.viewportW * t.dpr - w), dh = std::abs(t.viewportH * t.dpr - h);
-    if (dw > 8 || dh > 8) continue;
-    const double osScale = t.dpr / std::max(0.25, t.zoom);
-    const double dpos = std::abs(t.screenX * osScale - vp.left) + std::abs(t.screenY * osScale - vp.top);
-    const double score = (dw + dh) * 100 + dpos;
+    if (!t.title.empty() && windowTitle.rfind(t.title, 0) != 0) continue;
+    const auto r = PageRect(hwnd, t);
+    if (!r) continue;
+    // Several windows can show same-sized pages with the same title (the same page twice):
+    // then the page's reported screen position decides. The extension computes it as
+    // window position + (outer size - inner size), mixing DIPs with zoomed CSS px, so take
+    // the zoom back out. It's only a tie-breaker: a zoomed page must never fail to match.
+    const double zoom = std::max(0.25, t.zoom), osScale = t.dpr / zoom;
+    const double estX = t.screenX + t.viewportW * (1 - zoom) / 2, estY = t.screenY + t.viewportH * (1 - zoom);
+    const double dpos = std::abs(estX * osScale - r->left) + std::abs(estY * osScale - r->top);
+    // Same place too (e.g. two maximized windows): the one reporting most recently is in use.
+    const double score = dpos + std::min(now - t.lastSeen, 60.0) * 2;
     if (score < bestScore) {
       bestScore = score;
       best = tabId;
@@ -415,22 +488,32 @@ std::optional<int> ScrollTracker::ActiveTabFor(HWND hwnd, const RECT &vp) {
   return best;
 }
 
-std::optional<ScrollTracker::Target> ScrollTracker::ResolveBrowser(HWND hwnd, POINT pt) {
-  const auto vp = ChromiumViewport(hwnd);
-  if (!vp || !PtInRect(&*vp, pt)) return std::nullopt;
-  const auto tabId = ActiveTabFor(hwnd, *vp);
-  if (!tabId) return std::nullopt;
-  const auto &t = tabs_[*tabId];
+bool ScrollTracker::IsChromeAt(POINT pt) {
+  const HWND w = TopLevelWindowAt(pt);
+  return w && WindowClass(w) == L"Chrome_WidgetWin_1" && ProcessName(w) == L"chrome.exe";
+}
 
-  // Prefer an inner scroller containing the point, else the document.
+std::optional<ScrollTracker::Target> ScrollTracker::ResolveBrowser(HWND hwnd, POINT pt, int tabId, bool probe) {
+  const auto &t = tabs_[tabId];
+  const auto vp = PageRect(hwnd, t);
+  // On the browser's own tab strip or toolbar: nothing to follow, ink stays on screen.
+  if (!vp || !PtInRect(&*vp, pt)) return std::nullopt;
+
+  // Prefer an inner scroller containing the point, else the document. The page only
+  // reports inner scrollers once they scroll, so ask it about this point (see Refine).
   std::string scroller = "document";
   const double cssX = (pt.x - vp->left) / t.dpr, cssY = (pt.y - vp->top) / t.dpr;
+  if (probe && send_)
+    send_(json{{"type", "probe"}, {"v", 1}, {"tabId", tabId}, {"x", cssX}, {"y", cssY}}.dump());
   for (const auto &[key, s] : t.scrollers) {
     if (key != "document" && s.rectCss.Contains({static_cast<float>(cssX), static_cast<float>(cssY)})) {
       scroller = key;
       break;
     }
   }
+  // An image opened in Chrome: Chrome centres it, so zooming moves it around the page.
+  // Ink anywhere on the tab belongs to the image.
+  if (t.scrollers.count(kImageScroller)) scroller = kImageScroller;
 
   Target target;
   target.layerKey = "web:" + t.docKey + "#" + scroller;
@@ -454,9 +537,14 @@ std::optional<ScrollTracker::Target> ScrollTracker::Resolve(POINT pt) {
   HWND hwnd = TopLevelWindowAt(pt);
   if (!hwnd) return std::nullopt;
 
+  std::wstring title;
   if (IsChromiumBrowser(hwnd)) {
-    if (auto t = ResolveBrowser(hwnd, pt)) return t;
-    // Extension not installed or page not reachable (e.g. chrome:// or the PDF viewer): fall through.
+    // The page in the active tab reports to us: follow it exactly.
+    if (const auto tabId = ActiveTabFor(hwnd)) return ResolveBrowser(hwnd, pt, *tabId, true);
+    // Pages the extension can't run in (Chrome's PDF viewer, chrome:// pages), or no
+    // extension: track by UI Automation or optically below. Chrome shows the active tab's
+    // title as the window title; ink drawn now belongs to this tab only.
+    title = CurrentTitle(hwnd);
   }
 
   // Reuse an existing UIA/optical binding covering this point; binding again would
@@ -464,7 +552,7 @@ std::optional<ScrollTracker::Target> ScrollTracker::Resolve(POINT pt) {
   std::string key;
   int slot = -1;
   for (const auto &[k, b] : bindings_) {
-    if (b.hwnd != hwnd || b.workerSlot < 0) continue;
+    if (b.hwnd != hwnd || b.workerSlot < 0 || b.title != title) continue;
     const auto s = worker_->Get(b.workerSlot);
     if (s && s->alive && s->screenRect.Contains({static_cast<float>(pt.x), static_cast<float>(pt.y)})) {
       key = k;
@@ -481,6 +569,7 @@ std::optional<ScrollTracker::Target> ScrollTracker::Resolve(POINT pt) {
   b.source = snap->source;
   b.hwnd = hwnd;
   b.workerSlot = slot;
+  b.title = title;
   if (auto existing = bindings_.find(key); existing != bindings_.end()) b.manualDy = existing->second.manualDy;
   bindings_[key] = b;
 
@@ -496,22 +585,53 @@ std::optional<ScrollTracker::Target> ScrollTracker::Resolve(POINT pt) {
   return t;
 }
 
+std::optional<ScrollTracker::Target> ScrollTracker::Refine(const Target &target, POINT pt) {
+  if (target.source != SyncSource::Browser) return std::nullopt;
+  auto b = bindings_.find(target.layerKey);
+  if (b == bindings_.end() || b->second.scroller != "document" || b->second.tabId < 0) return std::nullopt;
+  auto refined = ResolveBrowser(b->second.hwnd, pt, b->second.tabId, false);
+  if (!refined || refined->layerKey == target.layerKey) return std::nullopt;
+  return refined;
+}
+
+std::wstring ScrollTracker::CurrentTitle(HWND hwnd) {
+  // InternalGetWindowText reads the cached title without sending the window a message, so
+  // a hung browser can't stall us.
+  wchar_t buf[512]{};
+  InternalGetWindowText(hwnd, buf, 512);
+  return buf;
+}
+
 bool ScrollTracker::UpdateBrowserLayer(Layer &layer, Binding &b) {
   Viewport v = layer.viewport;
   v.visible = false;
-  const auto vp = IsWindow(b.hwnd) ? ChromiumViewport(b.hwnd) : std::nullopt;
-  if (vp) {
-    const auto tabId = ActiveTabFor(b.hwnd, *vp);
+  if (IsWindow(b.hwnd) && !IsIconic(b.hwnd)) {
+    auto tabId = ActiveTabFor(b.hwnd);
+    const double now = Now();
+    if (tabId) {
+      b.tabId = *tabId;
+      b.lastMatch = now;
+    } else if (b.tabId >= 0 && now - b.lastMatch < kTabMatchGraceSeconds) {
+      // The window was just resized and the extension's report of the new size is still
+      // in flight. Keep the last tab if it's still the visible one in its window.
+      auto t = tabs_.find(b.tabId);
+      auto active = t != tabs_.end() ? activeTabByWindow_.find(t->second.windowId) : activeTabByWindow_.end();
+      if (active != activeTabByWindow_.end() && active->second == b.tabId) tabId = b.tabId;
+    }
     if (tabId) {
       const auto &t = tabs_[*tabId];
+      const auto vp = PageRect(b.hwnd, t);
       auto s = t.scrollers.find(b.scroller);
-      if (t.docKey == b.docKey && s != t.scrollers.end()) {
-        v.scale = t.dpr;
+      if (vp && t.docKey == b.docKey && s != t.scrollers.end()) {
+        v.scale = t.dpr * s->second.contentScale;
         v.scrollX = s->second.x;
         v.scrollY = s->second.y + b.manualDy;
+        v.clipArea = {};
         if (b.scroller == "document") {
           v.screenRect = ToRectF(*vp);
         } else {
+          // The image only anchors the ink; it shows anywhere on the page.
+          if (b.scroller == kImageScroller) v.clipArea = ToRectF(*vp);
           const auto &r = s->second.rectCss;
           v.screenRect = {static_cast<float>(vp->left + r.left * t.dpr), static_cast<float>(vp->top + r.top * t.dpr),
                           static_cast<float>(vp->left + r.right * t.dpr), static_cast<float>(vp->top + r.bottom * t.dpr)};
@@ -521,10 +641,7 @@ bool ScrollTracker::UpdateBrowserLayer(Layer &layer, Binding &b) {
       }
     }
   }
-  const bool changed = v.visible != layer.viewport.visible || v.scrollX != layer.viewport.scrollX ||
-      v.scrollY != layer.viewport.scrollY || v.scale != layer.viewport.scale ||
-      v.screenRect.left != layer.viewport.screenRect.left || v.screenRect.top != layer.viewport.screenRect.top ||
-      v.screenRect.right != layer.viewport.screenRect.right || v.screenRect.bottom != layer.viewport.screenRect.bottom;
+  const bool changed = !SameViewport(v, layer.viewport);
   layer.viewport = v;
   return changed;
 }
@@ -533,49 +650,50 @@ bool ScrollTracker::Update(Model &model) {
   bool changed = false;
   SyncSource best = SyncSource::None;
   float bestConf = 0;
+  std::vector<int> demand;
   for (const auto &layerPtr : model.Layers()) {
     Layer &layer = *layerPtr;
     if (!layer.isDocument) continue;
+    const Viewport before = layer.viewport;
     auto it = bindings_.find(layer.key);
     if (it == bindings_.end()) {
-      if (layer.viewport.visible) {
-        layer.viewport.visible = false;
-        changed = true;
-      }
+      layer.viewport.visible = false;
+      changed |= !SameViewport(before, layer.viewport);
       continue;
     }
     Binding &b = it->second;
     if (b.source == SyncSource::Browser) {
-      changed |= UpdateBrowserLayer(layer, b);
+      UpdateBrowserLayer(layer, b);
     } else if (auto snap = worker_->Get(b.workerSlot)) {
-      Viewport v = layer.viewport;
+      if (!layer.items.empty()) demand.push_back(b.workerSlot);
+      Viewport &v = layer.viewport;
       v.screenRect = snap->screenRect;
       v.scrollX = snap->scrollX;
       v.scrollY = snap->scrollY + b.manualDy;
       v.scale = 1.0;
       v.confidence = snap->confidence;
-      v.visible = snap->alive && !IsIconic(b.hwnd);
-      changed |= v.visible != layer.viewport.visible || v.scrollY != layer.viewport.scrollY ||
-          v.scrollX != layer.viewport.scrollX || v.screenRect.left != layer.viewport.screenRect.left ||
-          v.screenRect.top != layer.viewport.screenRect.top || v.screenRect.right != layer.viewport.screenRect.right ||
-          v.screenRect.bottom != layer.viewport.screenRect.bottom;
-      layer.viewport = v;
+      // Ink drawn on one Chrome tab hides while another tab is shown.
+      v.visible = snap->alive && !IsIconic(b.hwnd) && (b.title.empty() || CurrentTitle(b.hwnd) == b.title);
     }
 
-    // Hide ink when another window covers the document.
-    if (layer.viewport.visible) {
-      const auto &r = layer.viewport.screenRect;
-      const POINT c{static_cast<LONG>((r.left + r.right) / 2), static_cast<LONG>((r.top + r.bottom) / 2)};
-      if (TopLevelWindowAt(c) != b.hwnd) {
-        layer.viewport.visible = false;
-        changed = true;
-      }
+    // Clip ink to the parts of the document no other window covers. Partly covered
+    // documents keep showing ink in their uncovered parts.
+    Viewport &v = layer.viewport;
+    v.clip.clear();
+    if (v.visible) {
+      const auto r = v.ClipArea();
+      const RECT area{static_cast<LONG>(r.left), static_cast<LONG>(r.top), static_cast<LONG>(r.right),
+                      static_cast<LONG>(r.bottom)};
+      for (const auto &u : UncoveredRects(b.hwnd, area)) v.clip.push_back(ToRectF(u));
+      if (v.clip.empty()) v.visible = false;
     }
-    if (layer.viewport.visible && !layer.items.empty() && layer.viewport.confidence >= bestConf) {
+    changed |= !SameViewport(before, v);
+    if (v.visible && !layer.items.empty() && v.confidence >= bestConf) {
       best = b.source;
-      bestConf = layer.viewport.confidence;
+      bestConf = v.confidence;
     }
   }
+  worker_->SetDemand(std::move(demand));
   activeSource_ = best;
   activeConfidence_ = bestConf;
   return changed;

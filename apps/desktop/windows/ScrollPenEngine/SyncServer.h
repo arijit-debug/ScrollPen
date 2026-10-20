@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <functional>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -24,6 +25,8 @@ class SyncServer {
 
   bool Start(Options options, std::function<void(const std::string &)> onMessage);
   void Stop();
+  // Sends a text message to every connected extension. Any thread.
+  void Broadcast(const std::string &text);
   ~SyncServer() { Stop(); }
 
   bool Running() const { return running_; }
@@ -43,6 +46,10 @@ class SyncServer {
   std::atomic<bool> running_{false};
   std::atomic<bool> stop_{false};
   uintptr_t listen_{~uintptr_t{0}};
+  // Upgraded client sockets. Guards every frame we send, so frames from Broadcast and the
+  // server thread never interleave on one socket.
+  std::mutex sendMutex_;
+  std::vector<uintptr_t> upgraded_;
 };
 
 } // namespace sp

@@ -203,6 +203,7 @@ class Engine::Impl {
     device_.Create();
     renderer_ = std::make_unique<Renderer>(device_);
     tracker_.SetWakeCallback([hwnd = controller_] { PostMessageW(hwnd, WM_APP_WAKE, 0, 0); });
+    tracker_.SetSendCallback([this](const std::string &message) { sync_.Broadcast(message); });
     CreateOverlays();
     RegisterHotkeys();
     StartSyncServer();
@@ -260,7 +261,12 @@ class Engine::Impl {
         auto j = json::parse(*s, nullptr, false);
         if (!j.is_discarded()) {
           tracker_.OnBrowserMessage(j);
-          if (tracker_.Update(model_)) InvalidateCaches();
+          // Present right away: waiting for an idle queue can skip frames while the
+          // page scrolls, which makes ink trail the content.
+          if (tracker_.Update(model_)) {
+            InvalidateCaches();
+            RenderAll();
+          }
         }
         return 0;
       }
@@ -296,7 +302,11 @@ class Engine::Impl {
         }
         return 0;
       case WM_APP_WAKE:
-        if (tracker_.Update(model_)) InvalidateCaches();
+        // UIA/optical tracking moved: present now, like browser scroll messages.
+        if (tracker_.Update(model_)) {
+          InvalidateCaches();
+          RenderAll();
+        }
         return 0;
       case WM_APP_HOOKS_REINSTALLED:
         Emit({{"ev", "log"}, {"level", "warn"}, {"message", "Input hooks were reinstalled after Windows removed them."}});
@@ -609,20 +619,51 @@ class Engine::Impl {
     }
   }
 
+  // A short message next to the pointer, flipped left/up near the monitor's edges.
+  void ShowNotice(const wchar_t *text, POINT p) {
+    PointF at{static_cast<float>(p.x), static_cast<float>(p.y)};
+    MONITORINFO mi{sizeof(mi)};
+    if (GetMonitorInfoW(MonitorFromPoint(p, MONITOR_DEFAULTTONEAREST), &mi)) {
+      if (p.x + 400 > mi.rcMonitor.right) at.x -= 400;
+      if (p.y + 80 > mi.rcMonitor.bottom) at.y -= 80;
+    }
+    live_.notice = LiveState::Notice{text, at, Now()};
+    StartAnim();
+    Invalidate();
+  }
+
   void Begin(POINT p, float pressure, bool eraserEnd) {
-    pointerDown_ = true;
-    strokeTool_ = eraserEnd ? Tool::Eraser : tool_;
+    const Tool tool = eraserEnd ? Tool::Eraser : tool_;
     const PointF pt{static_cast<float>(p.x), static_cast<float>(p.y)};
+    // ScrollPen draws on Chrome pages only (images, PDFs and documents open there too).
+    // The boards are full-screen and the eraser only removes ink, so both work anywhere;
+    // laser trails fade by themselves.
+    const bool lasting = board_ == Board::None && tool != Tool::Eraser && tool != Tool::Laser;
+    if (board_ == Board::None && tool != Tool::Eraser && !tracker_.IsChromeAt(p)) {
+      ShowNotice(L"Open this in Chrome to draw on it", p);
+      return;
+    }
+    // Lasting ink must belong to a page, so it scrolls with it and hides with its tab.
+    // On Chrome's tab strip or toolbar it would belong to nothing and stay on screen over
+    // every other app.
+    std::optional<ScrollTracker::Target> target;
+    if (lasting) {
+      target = tracker_.Resolve(p);
+      if (!target) {
+        ShowNotice(L"Draw on the page, not on Chrome's tabs or toolbar", p);
+        return;
+      }
+    }
+    live_.notice.reset();
+    pointerDown_ = true;
+    strokeTool_ = tool;
     if (live_.text && strokeTool_ != Tool::Text) CommitText();
 
-    target_.reset();
-    if (settings_.documentMode && board_ == Board::None && strokeTool_ != Tool::Laser && strokeTool_ != Tool::Eraser) {
-      target_ = tracker_.Resolve(p);
-      const char *src = target_ ? SyncSourceName(target_->source) : "none";
-      if (lastSyncSource_ != src) {
-        lastSyncSource_ = src;
-        EmitState();
-      }
+    target_ = std::move(target);
+    const char *src = target_ ? SyncSourceName(target_->source) : "none";
+    if (lasting && lastSyncSource_ != src) {
+      lastSyncSource_ = src;
+      EmitState();
     }
 
     Item item;
@@ -742,6 +783,11 @@ class Engine::Impl {
       layerKey = "board";
       model_.GetOrCreateLayer(layerKey, false);
     } else if (target_) {
+      // The page may have reported an inner scroller under the stroke since it began.
+      if (!item.points.empty()) {
+        const POINT first{std::lround(item.points[0].x), std::lround(item.points[0].y)};
+        if (auto refined = tracker_.Refine(*target_, first)) target_ = std::move(refined);
+      }
       Layer &layer = model_.GetOrCreateDocumentLayer(target_->layerKey);
       if (layer.items.empty() || !layer.viewport.visible) layer.viewport = target_->viewport;
       const float scale = static_cast<float>(std::max(0.01, layer.viewport.scale));
@@ -854,7 +900,8 @@ class Engine::Impl {
                                            return t.empty() || now - t.back().t > live_.laserFadeSeconds;
                                          }),
                           live_.laser.end());
-        if (live_.laser.empty() && !(pointerDown_ && strokeTool_ == Tool::Laser)) {
+        if (live_.notice && !Renderer::NoticeActive(live_, now)) live_.notice.reset();
+        if (live_.laser.empty() && !(pointerDown_ && strokeTool_ == Tool::Laser) && !live_.notice) {
           animating_ = false;
           KillTimer(controller_, kTimerAnim);
         }
@@ -1399,8 +1446,7 @@ class Engine::Impl {
         {"canUndo", model_.CanUndo() || live_.text.has_value()},
         {"canRedo", model_.CanRedo()},
         {"itemCount", model_.ItemCount()},
-        {"sync", {{"source", lastSyncSource_}, {"confidence", tracker_.ActiveConfidence()}, {"serverRunning", syncRunning_}}},
-        {"hotkeyErrors", hotkeyErrors_},
+        {"sync", {{"source", lastSyncSource_}, {"confidence", tracker_.ActiveConfidence()}, {"serverRunning", syncRunning_}}},        {"hotkeyErrors", hotkeyErrors_},
         {"hookReinstalls", hooks_.ReinstallCount()},
         {"monitors", overlays_.size()},
         {"settings", settings_.ToJson()},

@@ -55,6 +55,14 @@ struct LiveState {
   // Text being typed.
   std::optional<Item> text;
   bool caretOn{true};
+  // A short message next to the pointer (e.g. "open this in Chrome"), fading out.
+  struct Notice {
+    std::wstring text;
+    PointF at;
+    double shownAt{};
+  };
+  std::optional<Notice> notice;
+  static constexpr double kNoticeSeconds = 2.5;
 };
 
 class Renderer {
@@ -73,6 +81,9 @@ class Renderer {
     DrawLive(rt, live, board, now);
   }
   static bool LaserActive(const LiveState &live, double now);
+  static bool NoticeActive(const LiveState &live, double now) {
+    return live.notice && now - live.notice->shownAt < LiveState::kNoticeSeconds;
+  }
 
   void ClearCache() { geometry_.clear(); }
   void Forget(uint64_t id) { geometry_.erase(id); }
@@ -82,6 +93,7 @@ class Renderer {
   void DrawItem(ID2D1RenderTarget *rt, const Item &item, const Layer *layer, bool caret = false);
   void DrawStroke(ID2D1RenderTarget *rt, const Item &item, const Layer *layer);
   void DrawLaser(ID2D1RenderTarget *rt, const LiveState &live, double now);
+  void DrawNotice(ID2D1RenderTarget *rt, const LiveState &live, double now);
   ID2D1SolidColorBrush *Brush(ID2D1RenderTarget *rt, uint32_t argb, float opacity = 1.0f);
   IDWriteTextFormat *Font(float size);
   ID2D1StrokeStyle *RoundStyle();

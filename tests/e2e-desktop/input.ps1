@@ -25,7 +25,7 @@ public static class Inp {
 "@
 [Inp]::SetProcessDpiAwarenessContext([IntPtr](-4)) | Out-Null
 
-$vk = @{ ctrl = 0x11; shift = 0x10; alt = 0x12; esc = 0x1B; capslock = 0x14; del = 0x2E; up = 0x26; down = 0x28 }
+$vk = @{ ctrl = 0x11; shift = 0x10; alt = 0x12; esc = 0x1B; capslock = 0x14; del = 0x2E; up = 0x26; down = 0x28; minus = 0xBD; plus = 0xBB }
 foreach ($step in $Steps) {
   $p = $step -split ' '
   switch ($p[0]) {

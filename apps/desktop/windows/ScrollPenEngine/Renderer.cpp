@@ -126,15 +126,19 @@ void Renderer::DrawCommitted(ID2D1RenderTarget *rt, const Model &model, const Li
     if (layer->isDocument && !layer->viewport.visible) continue;
     if (layer->isDocument) {
       const auto &v = layer->viewport;
-      rt->PushAxisAlignedClip(D2D1::RectF(v.screenRect.left, v.screenRect.top, v.screenRect.right, v.screenRect.bottom),
-                              D2D1_ANTIALIAS_MODE_ALIASED);
       const auto s = static_cast<float>(v.scale);
-      rt->SetTransform(D2D1::Matrix3x2F::Translation(static_cast<float>(-v.scrollX), static_cast<float>(-v.scrollY)) *
-                       D2D1::Matrix3x2F::Scale(s, s) *
-                       D2D1::Matrix3x2F::Translation(v.screenRect.left, v.screenRect.top) * base);
-      DrawLayer(rt, *layer, live);
-      rt->SetTransform(base);
-      rt->PopAxisAlignedClip();
+      const auto toScreen =
+          D2D1::Matrix3x2F::Translation(static_cast<float>(-v.scrollX), static_cast<float>(-v.scrollY)) *
+          D2D1::Matrix3x2F::Scale(s, s) * D2D1::Matrix3x2F::Translation(v.screenRect.left, v.screenRect.top) * base;
+      // Clip rects don't overlap, so drawing once per rect never double-blends highlights.
+      const std::vector<RectF> whole{v.ClipArea()};
+      for (const auto &c : v.clip.empty() ? whole : v.clip) {
+        rt->PushAxisAlignedClip(D2D1::RectF(c.left, c.top, c.right, c.bottom), D2D1_ANTIALIAS_MODE_ALIASED);
+        rt->SetTransform(toScreen);
+        DrawLayer(rt, *layer, live);
+        rt->SetTransform(base);
+        rt->PopAxisAlignedClip();
+      }
     } else {
       DrawLayer(rt, *layer, live);
     }
@@ -147,6 +151,7 @@ void Renderer::DrawLive(ID2D1RenderTarget *rt, const LiveState &live, Board boar
   if (live.active) DrawItem(rt, *live.active, nullptr);
   if (live.text) DrawItem(rt, *live.text, nullptr, live.caretOn);
   DrawLaser(rt, live, now);
+  DrawNotice(rt, live, now);
   if (live.eraserCursor) {
     auto *b = Brush(rt, board == Board::Black ? 0xFFFFFFFF : 0xFF333333, 0.8f);
     rt->DrawEllipse(D2D1::Ellipse(D2D1::Point2F(live.eraserCursor->x, live.eraserCursor->y), live.eraserRadius,
@@ -282,6 +287,26 @@ void Renderer::DrawItem(ID2D1RenderTarget *rt, const Item &item, const Layer *la
     default:
       break;
   }
+}
+
+void Renderer::DrawNotice(ID2D1RenderTarget *rt, const LiveState &live, double now) {
+  if (!NoticeActive(live, now)) return;
+  const auto &n = *live.notice;
+  // Fully visible, then fade over the last second.
+  const float alpha = static_cast<float>(std::clamp((LiveState::kNoticeSeconds - (now - n.shownAt)) / 1.0, 0.0, 1.0));
+  auto *fmt = Font(18.0f);
+  if (!fmt) return;
+  ComPtr<IDWriteTextLayout> tl;
+  device_.DWrite()->CreateTextLayout(n.text.c_str(), static_cast<UINT32>(n.text.size()), fmt, 10000.0f, 100.0f, &tl);
+  if (!tl) return;
+  DWRITE_TEXT_METRICS m{};
+  tl->GetMetrics(&m);
+  constexpr float padX = 12, padY = 8, offset = 18;
+  // Below-right of the pointer, like a tooltip.
+  const D2D1_RECT_F box = D2D1::RectF(n.at.x + offset, n.at.y + offset, n.at.x + offset + m.width + padX * 2,
+                                      n.at.y + offset + m.height + padY * 2);
+  rt->FillRoundedRectangle(D2D1::RoundedRect(box, 8, 8), Brush(rt, 0xFF202024, 0.92f * alpha));
+  rt->DrawTextLayout(D2D1::Point2F(box.left + padX, box.top + padY), tl.Get(), Brush(rt, 0xFFFFFFFF, alpha));
 }
 
 void Renderer::DrawLaser(ID2D1RenderTarget *rt, const LiveState &live, double now) {

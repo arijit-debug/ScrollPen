@@ -142,8 +142,17 @@ void SyncServer::Run() {
   std::vector<Client> clients;
 
   auto drop = [&](size_t i) {
+    {
+      std::lock_guard lock(sendMutex_);
+      upgraded_.erase(std::remove(upgraded_.begin(), upgraded_.end(), static_cast<uintptr_t>(clients[i].s)),
+                      upgraded_.end());
+    }
     closesocket(clients[i].s);
     clients.erase(clients.begin() + static_cast<ptrdiff_t>(i));
+  };
+  auto reply = [&](SOCKET s, uint8_t opcode, const std::string &payload) {
+    std::lock_guard lock(sendMutex_);
+    SendFrame(s, opcode, payload);
   };
 
   while (!stop_) {
@@ -211,7 +220,11 @@ void SyncServer::Run() {
         }
         const std::string resp = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
                                  "Sec-WebSocket-Accept: " + AcceptKey(key) + "\r\n\r\n";
-        SendAll(c.s, resp.data(), resp.size());
+        {
+          std::lock_guard lock(sendMutex_);
+          SendAll(c.s, resp.data(), resp.size());
+          upgraded_.push_back(static_cast<uintptr_t>(c.s));
+        }
         c.upgraded = true;
         c.in.erase(0, end + 4);
       }
@@ -246,9 +259,9 @@ void SyncServer::Run() {
         if (opcode == 0x1) {
           if (onMessage_) onMessage_(payload);
         } else if (opcode == 0x9) {
-          SendFrame(c.s, 0xA, payload);
+          reply(c.s, 0xA, payload);
         } else if (opcode == 0x8) {
-          SendFrame(c.s, 0x8, {});
+          reply(c.s, 0x8, {});
           closed = true;
           break;
         } else if (opcode != 0xA) {
@@ -259,7 +272,16 @@ void SyncServer::Run() {
       if (closed) drop(i);
     }
   }
+  {
+    std::lock_guard lock(sendMutex_);
+    upgraded_.clear();
+  }
   for (auto &c : clients) closesocket(c.s);
+}
+
+void SyncServer::Broadcast(const std::string &text) {
+  std::lock_guard lock(sendMutex_);
+  for (const uintptr_t s : upgraded_) SendFrame(static_cast<SOCKET>(s), 0x1, text);
 }
 
 } // namespace sp

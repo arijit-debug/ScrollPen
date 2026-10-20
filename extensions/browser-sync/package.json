@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@scrollpen/shared-types": "*"
+    "@scrollpen/shared-types": "*",
+    "pdfjs-dist": "^5.7.284"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.300",

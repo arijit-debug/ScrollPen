@@ -61,6 +61,13 @@ struct Viewport {
   double scale{1.0};     // physical px per document unit
   bool visible{true};
   float confidence{1.0f}; // 0..1, how much we trust scrollX/Y
+  // Where the ink may show, when that differs from screenRect (an image anchors the ink
+  // but the whole page shows it). Zero-sized means screenRect.
+  RectF clipArea;
+  // Uncovered parts of the clip area (other windows may overlap the document). Empty means
+  // all of it.
+  std::vector<RectF> clip;
+  RectF ClipArea() const { return clipArea.Width() > 0 ? clipArea : screenRect; }
 };
 
 struct Layer {

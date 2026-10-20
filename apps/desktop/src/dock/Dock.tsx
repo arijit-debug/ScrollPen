@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {dock, send, type ToolName} from '../native/scrollpen';
 import type {EngineState} from '../native/scrollpen';
@@ -8,7 +8,10 @@ export const DOCK_WIDTH = 64;
 
 // react-native-windows supports a native tooltip prop that RN's types don't declare.
 const tip = (text: string) => ({tooltip: text}) as object;
-export const DOCK_HEIGHT = 640;
+// Fits every button: grip 18 + 21 buttons x 30 + 4 separators x 9 + padding and border.
+export const DOCK_HEIGHT = 700;
+// Palette: two 22 px swatches per row, plus its bottom margin.
+const paletteHeight = (count: number) => Math.ceil(count / 2) * 22 + 4;
 
 const TOOLS: {tool: ToolName; glyph: string; label: string; key: string}[] = [
   {tool: 'pen', glyph: Glyph.pen, label: 'Pen', key: 'P'},
@@ -71,6 +74,12 @@ export function Dock({state, toast, onOpenSettings}: DockProps) {
   const theme = useTheme();
   const [showPalette, setShowPalette] = useState(false);
   const {settings} = state;
+
+  // The palette opens inline, so grow the window rather than push buttons off the bottom.
+  const extraHeight = showPalette ? paletteHeight(settings.palette.length) : 0;
+  useEffect(() => {
+    dock.resize(DOCK_WIDTH, DOCK_HEIGHT + extraHeight);
+  }, [extraHeight]);
 
   const pickTool = (tool: ToolName) => {
     send({cmd: 'setTool', tool});
@@ -204,7 +213,7 @@ const styles = StyleSheet.create({
   },
   button: {
     width: 40,
-    height: 30,
+    height: 28,
     marginVertical: 1,
     borderRadius: 6,
     alignItems: 'center',

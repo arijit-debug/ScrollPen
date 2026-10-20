@@ -43,8 +43,7 @@ export interface EngineState {
   canUndo: boolean;
   canRedo: boolean;
   itemCount: number;
-  sync: {source: SyncSourceName; confidence: number; serverRunning: boolean};
-  hotkeyErrors: string[];
+  sync: {source: SyncSourceName; confidence: number; serverRunning: boolean};  hotkeyErrors: string[];
   hookReinstalls: number;
   monitors: number;
   settings: EngineSettings;

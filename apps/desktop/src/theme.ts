@@ -17,7 +17,7 @@ export const Glyph = {
   undo: '',
   redo: '',
   clear: '',
-  board: '',
+  board: '',
   pin: '',
   camera: '',
   eye: '',

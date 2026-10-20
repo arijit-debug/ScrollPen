@@ -20,6 +20,10 @@ bool IsOwnWindow(HWND hwnd);
 // unaffected by whether our overlay is currently click-through).
 HWND TopLevelWindowAt(POINT pt);
 
+// The parts of `area` (screen px) where top-level window `target` is not covered by
+// another window above it. Empty when it's fully covered, minimized or gone.
+std::vector<RECT> UncoveredRects(HWND target, const RECT &area);
+
 // Executable name in lower case, e.g. L"chrome.exe". Empty if unavailable (e.g. elevated).
 std::wstring ProcessName(HWND hwnd);
 std::wstring WindowClass(HWND hwnd);

@@ -134,13 +134,12 @@ export function SettingsPanel({state, onClose}: {state: EngineState; onClose: ()
           <Switch value={s.hideDockFromCapture} onValueChange={v => update({hideDockFromCapture: v})} />
         </Row>
 
-        <Text style={[styles.section, {color: theme.muted}]}>BROWSER SYNC</Text>
+        <Text style={[styles.section, {color: theme.muted}]}>CHROME</Text>
         <Text style={[styles.hint, styles.para, {color: theme.muted}]}>
           {state.sync.serverRunning
-            ? `Listening on this PC only (127.0.0.1:${s.syncPort}). Install the ScrollPen Browser Sync extension in Chrome or Edge for exact sync on web pages.`
+            ? `ScrollPen draws on Chrome pages; open images, PDFs and documents in Chrome to draw on them. Install the ScrollPen Browser Sync extension so ink follows scrolling exactly (listening on this PC only, 127.0.0.1:${s.syncPort}).`
             : `Browser sync is off: port ${s.syncPort} is in use by another program.`}
         </Text>
-
         <Text style={[styles.section, {color: theme.muted}]}>PRIVACY</Text>
         <Text style={[styles.hint, styles.para, {color: theme.muted}]}>
           Everything stays on this PC. ScrollPen only watches the keyboard and mouse while you are drawing, never

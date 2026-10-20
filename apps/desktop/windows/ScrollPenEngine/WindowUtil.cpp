@@ -44,16 +44,69 @@ RECT VisibleFrame(HWND hwnd) {
   return r;
 }
 
+namespace {
+
+// Whether w is something the user actually sees on top of what's below it. Skips other
+// apps' overlays: click-through ones (other screen pens) and full-monitor layered tool
+// windows (e.g. the GeForce overlay), which stay mapped while drawing nothing.
+bool IsOccluder(HWND w, RECT *frame) {
+  if (!IsWindowVisible(w) || IsIconic(w) || IsOwnWindow(w)) return false;
+  const LONG_PTR ex = GetWindowLongPtrW(w, GWL_EXSTYLE);
+  if ((ex & WS_EX_TRANSPARENT) && (ex & WS_EX_LAYERED)) return false;
+  if (IsCloaked(w)) return false;
+  *frame = VisibleFrame(w);
+  if (frame->right <= frame->left || frame->bottom <= frame->top) return false;
+  if ((ex & WS_EX_LAYERED) && (ex & (WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE))) {
+    MONITORINFO mi{sizeof(mi)};
+    if (GetMonitorInfoW(MonitorFromRect(frame, MONITOR_DEFAULTTONEAREST), &mi) &&
+        frame->right - frame->left >= mi.rcMonitor.right - mi.rcMonitor.left - 2 &&
+        frame->bottom - frame->top >= mi.rcMonitor.bottom - mi.rcMonitor.top - 2)
+      return false;
+  }
+  return true;
+}
+
+} // namespace
+
 HWND TopLevelWindowAt(POINT pt) {
   for (HWND w = GetTopWindow(nullptr); w; w = GetWindow(w, GW_HWNDNEXT)) {
-    if (!IsWindowVisible(w) || IsIconic(w) || IsCloaked(w) || IsOwnWindow(w)) continue;
-    const LONG_PTR ex = GetWindowLongPtrW(w, GWL_EXSTYLE);
-    // Other apps' click-through overlays (e.g. other screen pens, game overlays).
-    if ((ex & WS_EX_TRANSPARENT) && (ex & WS_EX_LAYERED)) continue;
-    const RECT r = VisibleFrame(w);
-    if (PtInRect(&r, pt)) return w;
+    RECT r{};
+    if (IsOccluder(w, &r) && PtInRect(&r, pt)) return w;
   }
   return nullptr;
+}
+
+std::vector<RECT> UncoveredRects(HWND target, const RECT &area) {
+  std::vector<RECT> out;
+  if (!IsWindow(target) || IsIconic(target) || IsCloaked(target)) return out;
+  HRGN visible = CreateRectRgnIndirect(&area);
+  bool found = false;
+  for (HWND w = GetTopWindow(nullptr); w; w = GetWindow(w, GW_HWNDNEXT)) {
+    if (w == target) {
+      found = true;
+      break;
+    }
+    // Cheap reject before the DWM queries.
+    RECT wr{}, overlap{};
+    if (!GetWindowRect(w, &wr) || !IntersectRect(&overlap, &wr, &area)) continue;
+    RECT frame{};
+    if (!IsOccluder(w, &frame)) continue;
+    HRGN cover = CreateRectRgnIndirect(&frame);
+    const int kind = CombineRgn(visible, visible, cover, RGN_DIFF);
+    DeleteObject(cover);
+    if (kind == NULLREGION) break;
+  }
+  if (found) {
+    const DWORD bytes = GetRegionData(visible, 0, nullptr);
+    std::vector<uint8_t> buf(bytes);
+    auto *data = reinterpret_cast<RGNDATA *>(buf.data());
+    if (bytes && GetRegionData(visible, bytes, data)) {
+      const auto *rects = reinterpret_cast<const RECT *>(data->Buffer);
+      out.assign(rects, rects + data->rdh.nCount);
+    }
+  }
+  DeleteObject(visible);
+  return out;
 }
 
 std::wstring ProcessName(HWND hwnd) {
