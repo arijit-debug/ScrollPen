@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ScrollPen settings</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f7f8; --surface: #fff; --fg: #1b1b1f; --muted: #6b6b76; --border: #e1e1e6;
+      --accent: #2563eb; --accent-fg: #fff; --danger: #d32f2f;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #1f1f23; --surface: #2a2a30; --fg: #f2f2f5; --muted: #a0a0ab; --border: #3a3a42; --accent: #5b8def; --accent-fg: #0b0b0d; --danger: #ef5350; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .lead { color: var(--muted); margin: 0 0 24px; }
+    h2 { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 28px 0 8px; }
+    section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 4px 16px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--border); }
+    .row:first-child { border-top: 0; }
+    .row .text { min-width: 0; flex: 1; }
+    .row .hint { color: var(--muted); font-size: 12.5px; }
+    input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+    input[type="range"] { width: 200px; accent-color: var(--accent); flex: none; }
+    .value { min-width: 48px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+    button {
+      font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 6px 12px; cursor: pointer;
+    }
+    button:hover { border-color: var(--muted); }
+    button.danger { color: var(--danger); }
+    kbd { font: 12px ui-monospace, monospace; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; }
+    .keys { color: var(--muted); font-size: 13px; padding: 12px 0; }
+    .page { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 0; border-top: 1px solid var(--border); }
+    .page:first-child { border-top: 0; }
+    .page .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .page .url { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .page .actions { grid-row: 1 / span 2; grid-column: 2; display: flex; gap: 6px; align-items: center; }
+    .empty { color: var(--muted); padding: 12px 0; }
+    .footer { display: flex; justify-content: space-between; align-items: center; margin-top: 28px; color: var(--muted); font-size: 12.5px; }
+    @media (max-width: 560px) {
+      .row { flex-wrap: wrap; }
+      input[type="range"] { width: 100%; }
+      .page { grid-template-columns: 1fr; }
+      .page .actions { grid-row: auto; grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>ScrollPen</h1>
+  <p class="lead">Draw on any web page or PDF in Chrome. Click the ScrollPen button in the toolbar, or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>.</p>
+
+  <h2>Drawing</h2>
+  <section>
+    <div class="row">
+      <div class="text"><div>Follow scrolling</div><div class="hint">Ink sticks to the page as you scroll. Turn off to keep new ink fixed on the screen.</div></div>
+      <input type="checkbox" id="documentMode">
+    </div>
+    <div class="row">
+      <div class="text"><div>Filled shapes</div><div class="hint">Rectangles and ellipses get a see-through fill.</div></div>
+      <input type="checkbox" id="fill">
+    </div>
+    <div class="row">
+      <div class="text"><div>Laser fade</div><div class="hint">How long the laser pointer's trail stays.</div></div>
+      <input type="range" id="laserFadeSeconds" min="0.2" max="10" step="0.1"><span class="value" id="laserFadeSecondsValue"></span>
+    </div>
+    <div class="row"><div class="text">Pen size</div><input type="range" id="size-pen"><span class="value" id="size-penValue"></span></div>
+    <div class="row"><div class="text">Highlighter size</div><input type="range" id="size-highlighter"><span class="value" id="size-highlighterValue"></span></div>
+    <div class="row"><div class="text">Shape line size</div><input type="range" id="size-shape"><span class="value" id="size-shapeValue"></span></div>
+    <div class="row"><div class="text">Text size</div><input type="range" id="size-text"><span class="value" id="size-textValue"></span></div>
+  </section>
+
+  <h2>While drawing</h2>
+  <section>
+    <div class="row">
+      <div class="text"><div>Hold to click through</div><div class="hint">Hold this key to click links or type on the page without leaving the pen.</div></div>
+      <div class="chips" id="clickThroughKey"></div>
+    </div>
+    <div class="keys">
+      <kbd>P</kbd> pen · <kbd>H</kbd> highlighter · <kbd>L</kbd> laser · <kbd>E</kbd> eraser · <kbd>I</kbd> line ·
+      <kbd>A</kbd> arrow · <kbd>R</kbd> rectangle · <kbd>O</kbd> ellipse · <kbd>T</kbd> text ·
+      <kbd>W</kbd> whiteboard · <kbd>K</kbd> blackboard · <kbd>1</kbd>-<kbd>9</kbd> colours ·
+      <kbd>[</kbd> <kbd>]</kbd> size · <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> undo / redo ·
+      <kbd>Ctrl</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> nudge ink · <kbd>Delete</kbd> clear · <kbd>Esc</kbd> stop drawing.
+      Hold <kbd>Shift</kbd> while drawing a shape for straight lines, squares and circles.
+      In text: <kbd>Enter</kbd> new line, <kbd>Ctrl</kbd>+<kbd>Enter</kbd> or <kbd>Esc</kbd> to finish.
+      The mouse wheel keeps scrolling the page underneath.
+    </div>
+  </section>
+
+  <h2>Keyboard shortcuts</h2>
+  <section>
+    <div id="commands"></div>
+    <div class="row">
+      <div class="text hint">Shortcuts are set in Chrome. You can also make them work while Chrome isn't the active window.</div>
+      <button id="editShortcuts">Change shortcuts</button>
+    </div>
+  </section>
+
+  <h2>Toolbar and PDFs</h2>
+  <section>
+    <div class="row">
+      <div class="text"><div>Show the toolbar on every page</div><div class="hint">It opens ready to use; the page works normally until you pick a tool.</div></div>
+      <input type="checkbox" id="startActive">
+    </div>
+    <div class="row">
+      <div class="text"><div>Toolbar position</div><div class="hint">Drag the toolbar by its dots to move it.</div></div>
+      <button id="resetToolbar">Move back to the corner</button>
+    </div>
+    <div class="row">
+      <div class="text"><div>Open PDFs in ScrollPen</div><div class="hint">Chrome's own PDF viewer doesn't let extensions draw on it. ScrollPen's viewer shows the PDF on this computer and lets you draw on it.</div></div>
+      <input type="checkbox" id="openPdfs">
+    </div>
+  </section>
+
+  <h2>Pages with saved ink</h2>
+  <section id="pages"></section>
+  <p class="footer" style="margin-top: 8px"><span id="pageCount"></span><button class="danger" id="deleteAll">Delete all saved ink</button></p>
+
+  <h2>Privacy</h2>
+  <section>
+    <p>Everything stays on this computer, in this Chrome profile. ScrollPen has no account, no servers and no analytics,
+      and sends nothing anywhere. Your ink and the addresses of the pages you drew on are saved only so your ink is
+      there when you come back; delete them here at any time. Removing ScrollPen deletes all of it.</p>
+  </section>
+
+  <div class="footer"><span id="version"></span><button id="resetSettings">Reset all settings</button></div>
+</main>
+<script src="options.js"></script>
+</body>
+</html>

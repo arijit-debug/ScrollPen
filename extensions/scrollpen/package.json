@@ -1,0 +1,23 @@
+{
+  "name": "@scrollpen/extension",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ScrollPen: a Chrome extension for drawing on web pages and PDFs, with ink that stays on the page",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "pack": "node build.mjs && node scripts/pack.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^6.4.299",
+    "perfect-freehand": "^1.2.3"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.300",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.3"
+  }
+}

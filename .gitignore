@@ -2,29 +2,20 @@ node_modules/
 dist/
 *.log
 
-# Visual Studio / MSBuild
-.vs/
-*.user
-[Bb]in/
-[Oo]bj/
-x64/
-ARM64/
-AppPackages/
-BundleArtifacts/
-*.ProjectImports.zip
-
 # Playwright
 tests/e2e-chrome/report/
 tests/e2e-chrome/test-results/
 
-# Signing material never goes in git
-*.pfx
-*.p12
-
-# Installer output (scripts in apps/desktop/windows/installer)
+# Build output: the Web Store zip and screenshots (npm run ext:pack, npm run store:screenshots)
 release/
 
-# Environment files (none are used; never commit one)
+# Leftovers of the retired Windows desktop app (its source is in git history, commit 224b295)
+/apps/
+
+# Signing material and environment files never go in git (none are used)
+*.pfx
+*.p12
+*.pem
 .env
 .env.*
 .env*.local

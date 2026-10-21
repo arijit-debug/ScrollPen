@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "ScrollPen",
+  "version": "1.0.0",
+  "description": "Draw on any web page or PDF. Your ink stays on the page as you scroll, zoom and come back later. Nothing leaves your computer.",
+  "minimum_chrome_version": "123",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "ScrollPen: draw on this page (Alt+Shift+D)",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": { "default": "Alt+Shift+D" },
+      "description": "Start / stop drawing"
+    },
+    "clear": {
+      "suggested_key": { "default": "Alt+Shift+X" },
+      "description": "Clear all ink on this page"
+    },
+    "toggle-ink": {
+      "suggested_key": { "default": "Alt+Shift+H" },
+      "description": "Hide / show ink"
+    },
+    "screenshot": {
+      "suggested_key": { "default": "Alt+Shift+S" },
+      "description": "Screenshot"
+    },
+    "toggle-mode": {
+      "description": "Follow scrolling on / off"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options/options.html",
+  "permissions": ["storage", "unlimitedStorage", "activeTab", "scripting"],
+  "host_permissions": ["http://*/*", "https://*/*", "file:///*"],
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*", "file:///*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
+}

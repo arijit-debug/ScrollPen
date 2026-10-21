@@ -1,0 +1,81 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R 9 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 301 >>
+stream
+BT /F1 36 Tf 72 700 Td (ScrollPen sample, page 1) Tj ET
+1 0 0 RG 2 w
+0 100 m 612 100 l S
+0 200 m 612 200 l S
+0 300 m 612 300 l S
+0 400 m 612 400 l S
+0 500 m 612 500 l S
+0 600 m 612 600 l S
+0 700 m 612 700 l S
+BT /F1 14 Tf 72 640 Td (Draw on this page, then scroll: the ink stays with the text.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 301 >>
+stream
+BT /F1 36 Tf 72 700 Td (ScrollPen sample, page 2) Tj ET
+1 0 0 RG 2 w
+0 100 m 612 100 l S
+0 200 m 612 200 l S
+0 300 m 612 300 l S
+0 400 m 612 400 l S
+0 500 m 612 500 l S
+0 600 m 612 600 l S
+0 700 m 612 700 l S
+BT /F1 14 Tf 72 640 Td (Draw on this page, then scroll: the ink stays with the text.) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 301 >>
+stream
+BT /F1 36 Tf 72 700 Td (ScrollPen sample, page 3) Tj ET
+1 0 0 RG 2 w
+0 100 m 612 100 l S
+0 200 m 612 200 l S
+0 300 m 612 300 l S
+0 400 m 612 400 l S
+0 500 m 612 500 l S
+0 600 m 612 600 l S
+0 700 m 612 700 l S
+BT /F1 14 Tf 72 640 Td (Draw on this page, then scroll: the ink stays with the text.) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 8 0 R >>
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000127 00000 n 
+0000000197 00000 n 
+0000000548 00000 n 
+0000000674 00000 n 
+0000001025 00000 n 
+0000001151 00000 n 
+0000001502 00000 n 
+trailer
+<< /Size 10 /Root 1 0 R >>
+startxref
+1628
+%%EOF

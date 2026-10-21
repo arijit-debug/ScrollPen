@@ -2,109 +2,66 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-ScrollPen is a Windows-only screen pen (annotation overlay) whose ink can stay attached to scrolling content. It is a React Native for Windows 0.84.1 app (C++ Fabric host) with a native C++ engine, plus a Chrome/Edge extension that reports page scroll positions to the app.
+ScrollPen is a Chrome extension (Manifest V3) for drawing on web pages and PDFs, with ink attached to the page so it stays on the content while scrolling/zooming and is saved per page. It is published on the Chrome Web Store. It replaced a Windows desktop app (React Native for Windows + C++ engine + native-messaging helper); that app's source is in git history up to commit `224b295`. Leftover untracked build folders of it may exist in `apps/` (gitignored).
 
 ## Hard constraints
 
-- **Windows only.** No iOS/Android/macOS code, scripts or dependencies (they were deliberately stripped from the RN template).
-- **Fully offline after install.** No telemetry, crash-reporting services, auto-update checks, accounts or cloud sync. The extension reaches the app through Chrome native messaging and a per-user named pipe; the only socket is an opt-in loopback WebSocket for tests. Release builds bundle the JS (no Metro). Builds pass `--no-telemetry` to the RNW CLI (`ExperimentalFeatures.props`, npm scripts); keep it that way.
-- **All rendering is local** (Direct2D/DirectComposition on the GPU; WARP fallback). Each PC and Windows user is independent: ink lives in memory, settings in `%AppData%\ScrollPen\settings.json`.
+- **Nothing leaves the user's computer.** No servers, accounts, analytics, crash reporting or remote code. Ink and settings live in `chrome.storage.local` only (not `storage.sync`). The only network fetch is the PDF viewer loading the PDF the user opened. Chrome's own Web Store auto-update is the update channel.
+- **Web Store rules:** no remote code, every permission justified in `store/listing.md`; keep that file in sync when permissions change. The manifest must not have a `key` field (the store assigns the ID).
+- Feature parity with the retired desktop app was required by the user: every tool, setting and shortcut it had exists here (see "Features" below); don't drop any without asking.
 
 ## Commands
 
-The shell is PowerShell on Windows. After installing tools, refresh PATH in a new shell: `$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')`.
-
-Root (npm workspaces: `packages/*`, `extensions/*`, `tests/*`; `apps/desktop` is deliberately **not** a workspace and has its own `node_modules`):
+The shell is PowerShell on Windows (Bash tool also available). Root is an npm workspace (`extensions/*`, `tests/*`).
 
 ```powershell
-npm install; npm run app:install; npx playwright install chromium
-npm run ext:build          # bundle extension to extensions/browser-sync/dist (esbuild)
-npm run test:chrome        # build extension + Playwright tests against a mock host
-npm run chrome:sandbox     # interactive Chromium with extension + fixture pages, prints messages
-npm run mock-host          # stand-in for the app's dev WebSocket on 47615 (set chrome.storage.local {port: 47615} in the extension's worker)
-npm run typecheck          # extension + desktop app
+npm install; npx playwright install chromium
+npm run ext:build          # bundle to extensions/scrollpen/dist (esbuild); ext:watch adds source maps
+npm test                   # build + Playwright tests (tests/e2e-chrome)
+npm run typecheck
+npm run ext:pack           # release/scrollpen-<version>.zip (refuses source maps)
+npm run store:screenshots  # release/store/*.png, 1280x800, drawn by the real extension
+npm run sandbox            # headed Chromium with the extension + fixture pages
+npm run ext:icons          # regenerate icons/*.png (scripts/make-icons.mjs, no deps)
 ```
 
-Single Chrome test: `cd tests/e2e-chrome; npx playwright test -g "no drift"`.
+Single test: `cd tests/e2e-chrome; npx playwright test -g "eraser"`.
 
-Desktop app (`apps/desktop`):
-
-```powershell
-npm run windows            # debug build + deploy + launch (needs Metro; it starts one)
-npm start                  # Metro only (debug builds load JS from it)
-npm run windows:release    # release build, JS bundled
-npm test                   # Jest (@rnx-kit/jest-preset 'windows'); single: npx jest -t "renders"
-npx tsc --noEmit
-```
-
-Build without launching: `npx @react-native-community/cli run-windows --no-launch --no-packager --logging --no-telemetry`. Launch the deployed package with `Start-Process "shell:AppsFolder\ScrollPen_5j6dqts9n04aa!App"`.
-
-Engine library alone (fastest compile loop):
-```powershell
-$msbuild = "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe"
-& $msbuild apps\desktop\windows\ScrollPenEngine\ScrollPenEngine.vcxproj /p:Configuration=Debug /p:Platform=x64 /m /v:minimal
-```
-
-Native-messaging helper (needed for the extension to reach a locally built app; `-Chromium` also registers it for Playwright's Chromium):
-```powershell
-& $msbuild apps\desktop\windows\ScrollPenHost\ScrollPenHost.vcxproj /p:Configuration=Debug /p:Platform=x64   # -> apps\desktop\windows\x64\Debug\ScrollPenHost.exe
-pwsh apps\desktop\windows\installer\register-native-host.ps1 -HostExe apps\desktop\windows\x64\Debug\ScrollPenHost.exe -Chromium
-```
-Desktop link checks against the running app: `node tests\e2e-desktop\link-check.mjs`, `node tests\e2e-desktop\native-link.mjs`.
-
-Release installer (extension, `ScrollPenHost.exe`, signed Release MSIX, `release\ScrollPen-Setup.exe`): `pwsh apps\desktop\windows\installer\build-setup.ps1`. It signs with the non-exportable certificate "ScrollPen sideload signing" in `Cert:\CurrentUser\My` (no key file or password exists; the script header shows how to recreate it, TPM-backed). It also writes `ScrollPen-Setup.exe.sha256`, to publish next to the download (the setup is unsigned). Setup refuses an MSIX not signed by the bundled certificate, and installs `uninstall.ps1` (Start menu "Uninstall ScrollPen"), which removes the app, helper registration and extension folder, and the machine-wide certificate once no user on the PC has ScrollPen.
-
-Toolchain: Visual Studio 2026 (v145 toolset) with Windows SDK 10.0.22621 + 26100 and MSIX packaging tools, Node 22, PowerShell 7 (`pwsh`, required by the RNW CLI), .NET 10 SDK, Developer Mode on. `rnw-dependencies.ps1` in `apps/desktop/node_modules/react-native-windows/scripts` lists the required VS components.
+Release: bump `version` in both `extensions/scrollpen/manifest.json` and its `package.json`, then `npm run ext:pack`; the user uploads the zip (steps in `store/PUBLISHING.md`).
 
 ## Architecture
 
-### Native engine owns everything that's latency- or state-critical
-`apps/desktop/windows/ScrollPenEngine` is a C++20 static library linked into the RNW app (`windows/ScrollPen`). The engine, not JS, owns the annotation model, undo/redo, tool state, settings persistence and scroll sync. JS is only the dock/settings UI and mirrors engine state.
+### Drawing layer (`src/ink/overlay.ts`)
+One `Overlay` per page (content script `src/content.ts`, or the PDF viewer). `boot()` runs once per page (global guard: the toolbar button may inject `content.js` into tabs opened before install while Chrome also runs it). The overlay creates its DOM lazily (only when the page has saved ink or the user toggles it): a `<scrollpen-ink>` element appended to `<html>` with inline `!important` styles and a **closed** shadow root (pages can't see in; note `composedPath()` from window listeners can't see in either; use `this.root.activeElement`).
 
-- **Bridge:** `windows/ScrollPen/ScrollPenModule.h` is an attributed RN module (`ScrollPenNative`). JS calls `send(jsonCommand)`; the engine replies with `scrollpenEvent` device events (`{ev:"state", ...}` is the full state snapshot). Typed on the JS side in `src/native/scrollpen.ts`; command handling is `Engine::Impl::HandleCommand` in `Engine.cpp`. Keep both in sync when adding commands.
-- **Threads:** the engine runs its own message loop (`Engine.cpp`: controller window + one overlay window per monitor), separate from the RN UI thread. Low-level mouse/keyboard hooks run on a dedicated time-critical thread (`InputHooks.cpp`) whose callbacks only read atomics and `PostMessage`; a watchdog reinstalls hooks that Windows silently removed. UI Automation and optical tracking run on a worker thread inside `ScrollTracker.cpp`. Every one of these threads calls `SetThreadDpiAwarenessContext(PER_MONITOR_AWARE_V2)`; coordinates everywhere are physical virtual-screen pixels.
-- **Hooks exist only while drawing** (`SetActive`). In cursor mode ScrollPen sees no input, a deliberate privacy property.
-- **Click-through / scroll pass-through:** overlays are `WS_EX_LAYERED|WS_EX_NOREDIRECTIONBITMAP` and toggle `WS_EX_TRANSPARENT`. While drawing, the mouse hook swallows a wheel event over an overlay, makes overlays click-through for a short "burst", and re-injects the wheel with `SendInput` (tagged `InputHooks::kInjectedTag` so the hooks let it pass). A button press mid-burst ends the burst and is replayed onto the overlay. The configurable hold key (default CapsLock) also makes overlays click-through.
-- **Rendering:** `Renderer.cpp` draws with a shared D3D11/D2D/DWrite/DComp device. Each overlay caches committed ink in a bitmap (`cacheValid`) and redraws only live items (active stroke, text caret, laser, eraser cursor) per frame. Call `InvalidateCaches()` when the model or a document viewport changes, `Invalidate()` for live-only changes.
+Layers (`Item.layer`, see `types.ts`):
+- `doc`: an SVG absolutely positioned at the document origin; items are in document CSS px. The browser scrolls/zooms it with the content natively, so there is no sync code and no lag. The `<g>` is translated by `-(hostRect + scroll)` to cancel any offset of the host's containing block.
+- `el:<css path>`: inner scrolling elements (found under the pen by `scrollerAt`, keyed by `cssPath`). The SVG is placed over the element's client box (clipped) and translated by its scroll; re-laid-out on scroll (capture listener), resize, ResizeObserver and DOM mutations (targets that appear late are re-queried).
+- `image`: image tabs; scaled by displayed/natural width.
+- `screen`: fixed to the viewport ("follow scrolling" off, `settings.documentMode`).
+- `board`: whiteboard/blackboard, fixed, shown only while a board is open.
 
-### Model and coordinate spaces (`Model.h`)
-Items live in layers: `"screen"` (screen px), `"board"` (whiteboard/blackboard page), and document layers. Document-layer items are stored in **document units** (CSS px for browsers, physical px for UIA/optical) and mapped to the screen through the layer's live `Viewport` (`screenRect`, `scrollX/Y`, `scale`). On commit, `CommitItem` converts screen points to layer space and divides widths/font sizes by `scale`. All mutations go through `Model` so undo/redo stays consistent.
+Input: a fixed full-viewport `.capture` div takes pointer events only while drawing (`active`); pointer capture, coalesced events, pen pressure, pen eraser button (buttons & 32). Wheel over the capture layer scrolls the page natively; inner scrollers are scrolled by hand (`onWheel`). The hold-to-click-through key sets `.through` (pointer-events none). Keyboard shortcuts are a window capture-phase listener active only while drawing. Text opens a textarea on pointer **up** (pointer down moves focus and would close it).
 
-### Chrome only
-Lasting ink is drawn only on the page area of a Google Chrome window (`chrome.exe`); images, PDFs and documents are meant to be opened in Chrome. `Engine::Begin` refuses other strokes and shows an on-overlay notice (`LiveState::notice`): outside Chrome, or on Chrome's tab strip/toolbar (where `Resolve` finds no page). Every lasting stroke therefore belongs to a document layer; nothing persistent goes on the `"screen"` layer, which would show over other apps. Boards, laser and eraser work anywhere.
+Model: `items` plus undo/redo of `Op {add, remove}` (undo swaps them); nudging and erasing produce new ids so `renderAll` (keyed by id) re-renders. Saves are debounced to `chrome.storage.local` key `ink:<docKey>` (`docKey` = origin+path+query; `pdf:<url>` in the viewer); `storage.onChanged` adopts saves from other tabs/the settings page (own saves are recognised by `updated` timestamp set before saving). URL changes in single-page apps are polled (`checkUrl`). Everything read from storage goes through `sanitizeItems`/`sanitizeSettings`.
 
-### Scroll sync (`ScrollTracker.cpp`)
-At stroke start `Resolve(pt)` binds a layer to the page under the pen:
-1. **Browser** (exact): `ActiveTabFor(hwnd)` picks the tab Chrome shows in that window from extension reports. The window title must start with the tab's `document.title`; size and a zoom-corrected screen-position estimate break ties (never use that estimate as a filter: it is unit-mixed under browser zoom). `PageRect` places the page at the **bottom-left of the window's visible frame**, sized by the reported `innerWidth/innerHeight × devicePixelRatio`. Do not rely on Chrome's `Chrome_RenderWidgetHostHWND` children: in real Chrome they are hidden or stale. Layer key `web:<docKey>#<scroller>`.
-   - Inner scrollers: at stroke start the app sends a `probe` (app → extension through the same link, `Engine::SendToBrowser`); the page reports the vertically scrolling element under the pen, and `Refine` rebinds the stroke at commit.
-   - Image tabs: the picture is reported as scroller `image` with `contentScale`; ink is anchored to it (Chrome centres and zooms it), clipped to the whole page via `Viewport::clipArea`.
-2. **Fallback** for Chrome pages the extension can't see (`chrome://`, Chrome's own PDF viewer): UI Automation `ScrollPattern`, else optical (`OpticalFlow.cpp`, `PrintWindow` row matching), polled on a worker thread only for layers with ink. These bindings remember the window title and hide when another tab is shown.
+Rendering (`render.ts`): DOM calls only (never markup strings; text via `textContent`). Pen strokes are perfect-freehand outlines; highlighter is a stroked path at 0.35 opacity; shapes are SVG primitives.
 
-`Update()` refreshes every bound layer's viewport and clips ink to the uncovered parts of its window (`UncoveredRects`). Scroll messages and worker updates present immediately (`RenderAll()` right after `Update`); waiting for an idle queue makes ink trail the page.
+### Service worker (`src/background.ts`)
+Toolbar button / `_execute_action` (Alt+Shift+D) → `toggle` message to the tab (injects `content.js` via `scripting` if absent; marks the badge "!" where Chrome forbids extensions). `chrome.commands` (`clear`, `toggle-ink`, `screenshot`, `toggle-mode`) → `command` messages. ScrollPen's own pages (PDF viewer) don't receive `tabs.sendMessage`: they get a `runtime.sendMessage` broadcast with `tabId` and filter on `chrome.tabs.getCurrent()`. Screenshots: `captureVisibleTab` (needs `activeTab`, granted by the button/shortcut) for the sender's active tab only. `globalThis.scrollpenToggle(tabId)` exists for tests.
 
-### Browser extension and the app link
-- `packages/shared-types/src/sync-protocol.ts` defines the messages (extension → app: `hello`, `scroll`, `zoom`, `focus`, `navigate`; app → extension: `probe`, `welcome`; helper → extension: `host`; `v: 1`).
-- **Transport:** Chrome native messaging. The extension (fixed ID `egihgjpnabmnoljofdkeakgplgjeidai`, from the manifest `key`; also `kExtensionId` in `LocalPeer.h` and `register-native-host.ps1`) calls `connectNative('com.scrollpen.sync')`. Chrome starts `ScrollPenHost.exe` (`windows/ScrollPenHost`, registered in HKCU by `installer/register-native-host.ps1`, copied to `%LocalAppData%\ScrollPen\NativeHost`), which relays to the app's `PipeServer` over `\\.\pipe\ScrollPen.Sync.<user SID>` (DACL: that user only; remote clients rejected; exclusive first instance). The app accepts only `ScrollPenHost.exe` in its session as its user; the helper accepts only `ScrollPen.exe` and only ScrollPen's extension origin. Never reintroduce an unauthenticated listener: loopback ports are shared by every Windows user on the PC.
-- `SyncServer.cpp` (minimal RFC 6455 WebSocket) is for tests/dev only: compiled into **Debug builds only** (`#ifdef _DEBUG` in `StartSyncServer`) and off unless the `devWebSocket` setting is on; the extension uses it only when `chrome.storage.local.port` is set. It still binds loopback only and requires the pinned extension Origin, a loopback Host header, a TCP peer that is `chrome.exe` in our session, handshakes within 5 s, masked single-frame text messages and size limits.
-- `ScrollTracker::OnBrowserMessage` schema-checks every message (`ValidBrowserMessage`) and caps tab/scroller state; `Engine` also catches JSON type errors around it.
-- `extensions/browser-sync`: `src/reporter.ts` (shared by the content script and the PDF viewer) measures scroll per animation frame; the MV3 service worker (`background.ts`) adds `tabId/windowId/zoom`, holds one link (native, or a WebSocket when a test port is set) with throttled reconnects, and whenever the app becomes reachable resyncs: `hello`, `focus` for active tabs plus a `report` request to each page. `globalThis.scrollpenLink()` in the worker reports the link state.
-- **PDFs** open in the extension's own pdf.js viewer (`src/pdf/`, `pdfjs-dist` bundled by `build.mjs`): the service worker redirects `.pdf` URLs (http/https/file), including tabs already open when the extension is installed or updated. Chrome's built-in viewer hides scroll from extensions. Back from the viewer shows Chrome's viewer once (`chrome.storage.session` key `pdf-native:<tabId>`). The viewer lays pages out once at load so window resizes never move content under ink.
-- Protocol changes must update the TS types, the extension and `ValidBrowserMessage`/`OnBrowserMessage` together.
-- PDFs render with pdf.js 6 (no scripting, `enableXfa: false`) under the extension CSP (`script-src 'self'`); keep `pdfjs-dist` current, the viewer can read every site and local files. Release builds have no source maps (`build.mjs`, maps only with `--watch`). After changing the manifest or service worker, the unpacked extension must be reloaded in `chrome://extensions` and open tabs reloaded.
+### PDFs (`src/pdf/`)
+`.pdf` URLs (http/https/file) are redirected to `pdf/viewer.html#<url>` when `settings.openPdfs`; Back shows Chrome's viewer once (`chrome.storage.session` key `pdf-native:<tabId>`). The viewer only loads http/https/file, renders with pdf.js 6 (pass bytes as `Uint8Array`; a bare ArrayBuffer reads as empty), no scripting/XFA, under the extension CSP (`script-src 'self'`); pages are laid out once at load so ink never moves. Keep `pdfjs-dist` current (CI fails when it's behind). An empty response means a download manager grabbed the file; the viewer says so.
 
-### Tests
-- `tests/e2e-chrome`: Playwright **bundled Chromium** (branded Chrome 137+ ignores `--load-extension`) with fixture pages served on loopback and a mock host (`support/mock-host.mjs`, WebSocket) that accepts only the pinned extension ID and answers `hello` with `welcome`, like the app's dev WebSocket. The fixture points the extension at it via `chrome.storage.local.port`, so these tests never exercise native messaging (that's `tests/e2e-desktop/native-link.mjs`). Headless Chromium downloads PDFs instead of opening them, so the PDF redirect can't be tested there.
-- `tests/e2e-desktop`: helpers for driving the real app. `link-check.mjs` (malformed/flood/impostor checks through the real helper) and `native-link.mjs` (extension → helper → app in Chromium; register the helper with `-Chromium` first) need the app running but move no input. `input.ps1` synthesizes real mouse/keyboard input (`move`, `down`, `up`, `drag`, `wheel`, `keys ctrl+minus`...) and `chromium-host.mjs` opens Chromium with the extension against the real app. These move the user's actual cursor: ask first, keep runs short, and stop if foreign strokes appear (the user often tests at the same time). Bring the test window to the front before each input batch; the IDE tends to take focus back.
-- Verifying sync: measure the ink's row offset from fixture marker lines (red) in screenshots across scroll/zoom; a constant offset (or one scaling with zoom) means the ink is attached.
-- Testing PDFs/images via `file://` in Playwright needs extension file access: call `chrome.developerPrivate.updateExtensionConfiguration({extensionId, fileAccess: true})` from a `chrome://extensions` page in a persistent profile, close, relaunch. Toggling it in a live session reloads and breaks a command-line-loaded extension. On this machine Internet Download Manager intercepts PDFs served over http, so use `file://`.
+### Tests (`tests/e2e-chrome`)
+Playwright **bundled Chromium** (branded Chrome 137+ ignores `--load-extension`), fixture pages on loopback. Tests draw with the real mouse in green (`#00C853`, set via storage in the fixture) and check screen pixels (`inkNear`, pngjs) plus saved storage. Chrome shortcuts can't be pressed from tests; `command()` sends the same message. On this PC Internet Download Manager intercepts `.pdf` downloads even from 127.0.0.1 (answers 204), so the PDF test uses `fixtures/sample.pdfdata` (same bytes; `support/make-pdf.mjs` writes both).
+
+## Features (parity checklist with the old app)
+Pen, highlighter, laser (fade time setting), eraser, line, arrow, rect, ellipse (filled option), text (Enter newline, Ctrl+Enter/Esc finish); 9-colour palette (keys 1-9), sizes per tool (`[` `]`); undo/redo (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z); clear (Delete); whiteboard W / blackboard K; follow scrolling on/off; hide ink; screenshot; Ctrl+↑/↓ nudge ink; hold-to-click-through key (CapsLock/`/F8/RCtrl/off); minimize toolbar; draggable toolbar; "show toolbar on every page" (old "start active"); configurable shortcuts (chrome://extensions/shortcuts); reset settings. Not possible in an extension: hiding the toolbar from screen capture (use minimize).
 
 ## Gotchas
-
-- The app links the **static CRT** (`/MT`, `/MTd`); the engine project must match, or linking fails with `RuntimeLibrary` mismatches. New Win32 APIs may need libs added to the app's `AdditionalDependencies` in `ScrollPen.vcxproj`. Control Flow Guard is Release-only (it conflicts with Debug `/ZI`).
-- The dock is hidden from screen capture by default (`hideDockFromCapture` → `WDA_EXCLUDEFROMCAPTURE`), so screenshots won't show it. Set `{"hideDockFromCapture": false}` in `%AppData%\ScrollPen\settings.json` while testing, and restore it afterwards.
-- The editor's clangd has no compile database for the vcxproj and reports spurious errors (`std::optional` unknown, `HWND` unknown). Trust MSBuild output.
-- The dock is a frameless WinAppSDK `AppWindow` forced to `WS_POPUP` (overlapped windows can't be narrower than `SM_CXMIN`), with a `WM_NCCALCSIZE` subclass because WinAppSDK keeps re-adding `WS_DLGFRAME` (a white 3-D border). RN `RN_TOOLTIP` popups are made click-through (WinEvent hook in `ScrollPen.cpp`) because lingering tooltips covered dock buttons. Dock dragging is a native cursor-polling thread (`ScrollPenModule.h`), not `WM_NCLBUTTONDOWN`.
-- The app is single-instance per login session (`Local\ScrollPen.SingleInstance` mutex). Stop the running `ScrollPen` process before redeploying.
-- `apps/desktop/patches/braces` is braces 3.0.3 with a nesting-depth limit (GHSA-vfj7-8cjw-p6xm had no fixed release); `package.json` overrides it, plus `@xmldom/xmldom`, `fast-xml-parser` and the istanbul `js-yaml`. Drop overrides once upstream fixes ship; `npm audit` must stay at 0 in both roots.
-- In the Bash tool `python3` may resolve to the Windows Store stub; use `python`.
-- Git: `.gitattributes` forces LF except VS project/solution files (CRLF). Commit messages written from PowerShell should go through a UTF-8 file **without BOM** (`git commit -F file`).
+- After changing the manifest or service worker, reload the unpacked extension in `chrome://extensions` and reload open tabs.
+- `CSS` is the browser global (`CSS.escape`); don't shadow it (the stylesheet constant is `SHADOW_CSS`).
+- In the Bash tool `python3` may resolve to the Windows Store stub; use `python`. Scratch scripts outside the repo must import Playwright by file URL (`file:///E:/ScrollPen/node_modules/@playwright/test/index.mjs`).
+- Git: `.gitattributes` forces LF. Commit messages written from PowerShell go through a UTF-8 file without BOM (`git commit -F file`).
+- `npm audit` must stay at 0.

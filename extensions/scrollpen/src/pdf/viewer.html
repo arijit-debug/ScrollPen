@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PDF</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; background: #3c3f43; font: 13px "Segoe UI", system-ui, sans-serif; color: #e8eaed; }
+    /* Always reserve the scrollbar, so fitting pages to the width doesn't overflow it. */
+    html { overflow-y: scroll; }
+    #pages { padding: 24px; display: flex; flex-direction: column; gap: 12px; width: max-content; }
+    .page { background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); }
+    .page canvas { display: block; width: 100%; height: 100%; }
+    #status { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; }
+    #native {
+      position: fixed; left: 16px; bottom: 16px; padding: 6px 10px; border: 0; border-radius: 6px;
+      background: rgba(32, 33, 36, 0.85); color: #e8eaed; font: inherit; cursor: pointer; opacity: 0.6;
+    }
+    #native:hover { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="pages"></div>
+  <div id="status">Opening PDF...</div>
+  <button id="native" title="Open this file in Chrome's built-in PDF viewer (ink won't follow scrolling there)">Chrome viewer</button>
+  <script type="module" src="viewer.js"></script>
+</body>
+</html>
