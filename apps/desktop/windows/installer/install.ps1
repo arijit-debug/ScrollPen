@@ -17,6 +17,13 @@ try {
   # other programs could write to, and never text spliced into a command.
   $bytes = [IO.File]::ReadAllBytes((Join-Path $here 'ScrollPen.cer'))
   $thumb = (New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 (, $bytes)).Thumbprint
+  # Never trust a certificate that didn't sign the package it came with. (The signature
+  # can't verify as trusted yet, but its signer and an intact hash can be checked.)
+  $sig = Get-AuthenticodeSignature (Join-Path $here 'ScrollPen.msix')
+  if (-not $sig.SignerCertificate -or $sig.SignerCertificate.Thumbprint -ne $thumb -or
+      $sig.Status -in 'HashMismatch', 'NotSigned', 'Incompatible') {
+    throw 'ScrollPen.msix is not signed by the certificate in this setup. Download ScrollPen again.'
+  }
   if (-not (Test-Path "Cert:\LocalMachine\TrustedPeople\$thumb")) {
     # MSIX sideloading only trusts certificates in the machine store, which needs admin.
     $cmd = "`$c = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 (, [Convert]::FromBase64String('" +
@@ -49,6 +56,18 @@ try {
   if (Test-Path $ext) { Remove-Item $ext -Recurse -Force }
   Expand-Archive -Path (Join-Path $here 'ChromeExtension.zip') -DestinationPath $ext -Force
 
+  # The uninstaller also removes the certificate trusted above.
+  $un = Join-Path $env:LOCALAPPDATA 'ScrollPen\Uninstall'
+  New-Item -ItemType Directory -Force $un | Out-Null
+  Copy-Item -LiteralPath (Join-Path $here 'uninstall.ps1') -Destination $un -Force
+  Set-Content -LiteralPath (Join-Path $un 'certificate.thumbprint') -Value $thumb -Encoding ascii
+  $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut(
+    (Join-Path ([Environment]::GetFolderPath('Programs')) 'Uninstall ScrollPen.lnk'))
+  $lnk.TargetPath = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+  $lnk.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$(Join-Path $un 'uninstall.ps1')`""
+  $lnk.Description = 'Remove ScrollPen, its Chrome link and its certificate'
+  $lnk.Save()
+
   Start-Process "shell:AppsFolder\$((Get-AppxPackage -Name ScrollPen).PackageFamilyName)!App"
   Start-Process explorer.exe $ext
   Show(@"
@@ -62,6 +81,10 @@ To make ink follow pages in Chrome, add the ScrollPen extension once:
    (If an older ScrollPen Browser Sync is listed, remove it first.)
 4. In the extension's Details, turn on "Allow access to file URLs"
    (for local PDFs and images).
+
+ScrollPen never checks for updates by itself. Run a newer setup to get fixes
+(including for the PDF viewer), then restart Chrome so it loads the new extension.
+To remove ScrollPen, use "Uninstall ScrollPen" in the Start menu.
 "@)
 } catch {
   Write-Output $_

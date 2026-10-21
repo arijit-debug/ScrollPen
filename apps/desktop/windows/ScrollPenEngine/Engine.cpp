@@ -1195,15 +1195,19 @@ class Engine::Impl {
     pipeRunning_ = pipe_.Start({}, [controller](const std::string &m) { PostSync(controller, m); });
   }
 
-  // Development/tests only: the same messages over ws://127.0.0.1:syncPort.
+  // Development/tests only: the same messages over ws://127.0.0.1:syncPort. Compiled into
+  // Debug builds only: its peer check can't verify the user (see SyncServer.cpp), and
+  // release users never need it.
   void StartSyncServer() {
     sync_.Stop();
+#ifdef _DEBUG
     if (!settings_.devWebSocket) return;
     SyncServer::Options opts;
     opts.port = settings_.syncPort;
     opts.allowedExtensionIds = settings_.allowedExtensionIds;
     const HWND controller = controller_;
     sync_.Start(opts, [controller](const std::string &m) { PostSync(controller, m); });
+#endif
   }
 
   void SendToBrowser(const std::string &message) {

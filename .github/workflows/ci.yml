@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   js:
     name: Extension + Chrome tests + app unit tests
@@ -16,6 +19,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # The extension parses untrusted PDFs and users only get fixes from a new setup:
+      # fail as soon as pdf.js publishes a release we don't ship.
+      - name: pdf.js is current
+        shell: bash
+        run: |
+          current=$(node -p "require('pdfjs-dist/package.json').version")
+          latest=$(npm view pdfjs-dist version)
+          if [ "$current" != "$latest" ]; then echo "::error::pdfjs-dist $current is installed, $latest is out"; exit 1; fi
       - run: npx playwright install chromium
       - run: npm run typecheck -w @scrollpen/browser-sync
       - run: npm run test:chrome

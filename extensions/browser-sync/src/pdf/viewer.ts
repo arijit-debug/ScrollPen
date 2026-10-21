@@ -15,6 +15,14 @@ interface Slot {
 
 /** The PDF's own URL: viewer.html#<encoded url>. */
 const source = decodeURIComponent(location.hash.slice(1));
+/** Only the addresses the service worker routes here (it already checks this). */
+const sourceAllowed = (() => {
+  try {
+    return ['http:', 'https:', 'file:'].includes(new URL(source).protocol);
+  } catch {
+    return false;
+  }
+})();
 const pagesEl = document.getElementById('pages') as HTMLDivElement;
 const statusEl = document.getElementById('status') as HTMLDivElement;
 let scale = 1;
@@ -105,6 +113,8 @@ function watchZoom(): void {
 }
 
 async function main(): Promise<void> {
+  // This page can read any site with the user's cookies: never load anything else.
+  if (!sourceAllowed) throw new Error('Only http, https and file addresses can be opened.');
   document.title = fileName(source);
   document.getElementById('native')!.addEventListener('click', () => {
     // The service worker lets this tab open the file in Chrome's own viewer once.

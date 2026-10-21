@@ -3,12 +3,19 @@
 # and its x64 dependencies, the public signing certificate and the setup script.
 #
 # Signing uses the certificate "ScrollPen sideload signing" (CN=ScrollPen Developer, matching the package
-# Publisher) in Cert:\CurrentUser\My. Its private key is non-exportable and never written
-# to disk; create it once with:
+# Publisher) in Cert:\CurrentUser\My. Setup makes every user's PC trust it machine-wide (until
+# "Uninstall ScrollPen" removes it), so its private key lives in the TPM: it can't be copied
+# off this PC, not even by malware running as you. Create it once with:
 #   New-SelfSignedCertificate -Type Custom -Subject 'CN=ScrollPen Developer' -KeyUsage DigitalSignature `
-#     -KeyExportPolicy NonExportable -KeyAlgorithm RSA -KeyLength 3072 `
+#     -Provider 'Microsoft Platform Crypto Provider' -KeyExportPolicy NonExportable `
+#     -KeyAlgorithm RSA -KeyLength 2048 `
 #     -FriendlyName 'ScrollPen sideload signing' -CertStoreLocation Cert:\CurrentUser\My `
 #     -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}') -NotAfter (Get-Date).AddYears(3)
+# (TPMs only hold RSA 2048 keys.) A new certificate has a new thumbprint: existing users trust
+# it with one more UAC prompt when they run the next setup.
+#
+# Next to the setup it writes ScrollPen-Setup.exe.sha256: publish that hash where people find
+# the download (the setup itself is unsigned), so they can check it with Get-FileHash.
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path "$PSScriptRoot\..\..\..\..").Path
 $windows = (Resolve-Path "$PSScriptRoot\..").Path
@@ -18,6 +25,12 @@ $cert = Get-ChildItem Cert:\CurrentUser\My |
   Where-Object { $_.Subject -eq 'CN=ScrollPen Developer' -and $_.FriendlyName -eq 'ScrollPen sideload signing' -and $_.HasPrivateKey -and $_.NotAfter -gt (Get-Date) } |
   Sort-Object NotAfter | Select-Object -Last 1
 if (-not $cert) { throw 'Signing certificate not found (see the comment at the top of this script).' }
+$provider = try {
+  [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert).Key.Provider.Provider
+} catch { 'unknown provider' }
+if ($provider -ne 'Microsoft Platform Crypto Provider') {
+  Write-Warning "The signing key is not in the TPM ($provider). See the comment at the top of this script."
+}
 
 function Invoke-Checked([string]$what, [scriptblock]$run) {
   & $run
@@ -52,7 +65,7 @@ New-Item -ItemType Directory -Force $stage | Out-Null
 
 Copy-Item $msix.FullName "$stage\ScrollPen.msix"
 Export-Certificate -Cert $cert -FilePath "$stage\ScrollPen.cer" | Out-Null # public part only
-Copy-Item "$PSScriptRoot\install.ps1", "$PSScriptRoot\register-native-host.ps1", $hostExe -Destination $stage
+Copy-Item "$PSScriptRoot\install.ps1", "$PSScriptRoot\uninstall.ps1", "$PSScriptRoot\register-native-host.ps1", $hostExe -Destination $stage
 Get-ChildItem "$($pkgDir.FullName)\Dependencies\x64" -File | Copy-Item -Destination $stage
 Compress-Archive -Path "$extDist\*" -DestinationPath "$stage\ChromeExtension.zip"
 
@@ -93,4 +106,7 @@ Set-Content -Path $sedPath -Value $sed -Encoding ascii
 if (Test-Path $target) { Remove-Item $target -Force }
 Start-Process "$env:WINDIR\System32\iexpress.exe" -ArgumentList '/N', '/Q', $sedPath -Wait
 if (-not (Test-Path $target)) { throw 'IExpress did not produce the setup file.' }
-Get-Item $target
+# The setup is unsigned: this hash, published apart from the download, is how people check it.
+$hash = (Get-FileHash $target -Algorithm SHA256).Hash
+Set-Content -LiteralPath "$target.sha256" -Value "$hash  ScrollPen-Setup.exe" -Encoding ascii
+Get-Item $target, "$target.sha256"

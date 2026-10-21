@@ -317,6 +317,8 @@ void SyncServer::Run() {
 }
 
 void SyncServer::Broadcast(const std::string &text) {
+  // SendFrame only writes 7- and 16-bit lengths.
+  if (text.size() > options_.maxMessageBytes || text.size() > 0xFFFF) return;
   std::lock_guard lock(sendMutex_);
   for (const uintptr_t s : upgraded_) SendFrame(static_cast<SOCKET>(s), 0x1, text);
 }
