@@ -32,7 +32,8 @@ npm run ext:watch      # rebuild on change (with source maps)
 npm test               # build + all Chrome tests
 npm run sandbox        # a Chromium window with ScrollPen and the test pages, to try by hand
 npm run typecheck
-npm run ext:pack       # -> release/scrollpen-<version>.zip for the Chrome Web Store
+npm run ext:pack       # -> release/scrollpen-<version>.zip (Chrome Web Store) and
+                       #    release/ScrollPen-for-friends-<version>.zip (to share; steps in share/HOW TO INSTALL.txt)
 npm run store:screenshots
 ```
 

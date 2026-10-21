@@ -1,0 +1,70 @@
+ScrollPen - draw on any web page or PDF in Google Chrome
+=========================================================
+
+Your ink stays on the page when you scroll, and it's still there when you come back.
+Everything stays on your computer.
+
+
+INSTALL (about 2 minutes)
+-------------------------
+
+1. Unzip the file you received:
+   right-click the .zip file > "Extract All..." > Extract.
+
+2. Move the "ScrollPen" folder somewhere it can stay for good,
+   for example your Documents folder.
+   Chrome runs ScrollPen from this folder: if you delete or move it later,
+   ScrollPen stops working (and your saved ink is lost).
+
+3. Open Google Chrome, type   chrome://extensions   in the address bar and press Enter.
+
+4. Turn on "Developer mode" (the switch in the top-right corner).
+
+5. Click "Load unpacked" (top-left), open the "ScrollPen" folder
+   (the one with this file in it) and click "Select Folder".
+
+6. ScrollPen now appears in the list. To keep its button handy:
+   click the puzzle-piece icon to the right of Chrome's address bar,
+   then click the pin next to "ScrollPen".
+
+7. Optional, for PDFs and pictures saved on your computer:
+   on the chrome://extensions page, click "Details" under ScrollPen and
+   turn on "Allow access to file URLs".
+
+
+USE IT
+------
+
+- Open any website and click the ScrollPen button (or press Alt+Shift+D).
+  A toolbar appears on the right. Draw!
+- Scroll with the mouse wheel as usual; the ink moves with the page.
+- Press Esc (or the arrow button at the top of the toolbar) to use the page
+  normally again. Click the X on the toolbar to close it; your ink stays.
+- Hold Caps Lock to click a link without leaving the pen.
+- Handy keys while drawing:
+    P pen   H highlighter   L laser   E eraser   T text
+    I line   A arrow   R rectangle   O ellipse
+    W whiteboard   K blackboard   1-9 colours   [ ] size
+    Ctrl+Z undo   Ctrl+Y redo   Delete clear the page
+- Settings and the list of pages with saved ink: right-click the ScrollPen
+  button > "Options".
+
+ScrollPen can't draw on Chrome's own pages (like chrome://extensions or the
+Chrome Web Store). PDF links open in ScrollPen's own PDF viewer so you can draw
+on them.
+
+
+GOOD TO KNOW
+------------
+
+- Chrome may sometimes show a message about "developer mode extensions".
+  That's normal for extensions installed this way; you can close it.
+- ScrollPen doesn't update itself. When you get a newer version:
+  unzip it, copy everything from its "ScrollPen" folder into your existing
+  "ScrollPen" folder (replace the files), then on chrome://extensions click
+  the round reload arrow on ScrollPen. Your saved ink is kept.
+- To remove ScrollPen: on chrome://extensions click "Remove" under ScrollPen,
+  then delete the folder. This also deletes your saved ink.
+
+Privacy: ScrollPen has no account, no servers and no tracking, and sends
+nothing anywhere. Your ink is saved only on your computer.

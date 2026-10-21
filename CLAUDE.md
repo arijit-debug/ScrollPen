@@ -19,7 +19,7 @@ npm install; npx playwright install chromium
 npm run ext:build          # bundle to extensions/scrollpen/dist (esbuild); ext:watch adds source maps
 npm test                   # build + Playwright tests (tests/e2e-chrome)
 npm run typecheck
-npm run ext:pack           # release/scrollpen-<version>.zip (refuses source maps)
+npm run ext:pack           # release/scrollpen-<version>.zip (Web Store) + release/ScrollPen-for-friends-<version>.zip (load unpacked, with share/HOW TO INSTALL.txt)
 npm run store:screenshots  # release/store/*.png, 1280x800, drawn by the real extension
 npm run sandbox            # headed Chromium with the extension + fixture pages
 npm run ext:icons          # regenerate icons/*.png (scripts/make-icons.mjs, no deps)
