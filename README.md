@@ -1,46 +1,91 @@
 # ScrollPen
 
-A Chrome extension for drawing on web pages and PDFs. The ink is attached to the page, so it
-stays on the same content while you scroll or zoom, and it is saved for each page so it's
-there when you come back. Everything stays on your computer.
+**Draw on any web page or PDF in Google Chrome, and your ink stays on the page.**
+Scroll, zoom or come back tomorrow: your notes are still on the same words.
+Everything stays on your computer.
 
-Tools: pen (pressure-sensitive), highlighter, laser pointer, eraser, line, arrow, rectangle,
-ellipse, text, whiteboard/blackboard, undo/redo, screenshots, nine colours and adjustable sizes.
+![ScrollPen drawing on a web page](docs/screenshot.png)
 
-## Repository layout
+## Features
 
-```
-extensions/scrollpen/     the extension (TypeScript, bundled with esbuild into dist/)
-  src/ink/                drawing layer: model, rendering, toolbar, storage
-  src/background.ts       toolbar button, shortcuts, screenshots, PDF redirect
-  src/pdf/                ScrollPen's PDF viewer (pdf.js)
-  src/options/            settings page
-  scripts/                icon drawing and Web Store zip packing
-tests/e2e-chrome/         Playwright tests that draw with the real extension in Chromium
-store/                    Web Store listing text, privacy policy and publishing steps
-```
+- **Tools:** pen (pressure-sensitive with a pen tablet), highlighter, laser pointer, eraser
+  (or your pen's eraser end), line, arrow, rectangle, ellipse and text
+- **Ink that stays put:** attached to the page, it scrolls and zooms with the content, also
+  inside scrolling panels within a page (chats, documents, code viewers)
+- **Saved for each page:** your ink comes back when you open the page again
+- **PDFs:** PDF links open in ScrollPen's own viewer so you can draw on them
+- **Whiteboard and blackboard** for quick sketches
+- 9 colours, adjustable sizes, filled shapes, undo/redo, hide ink, screenshots
+- "Follow scrolling" switch, to keep ink fixed on the screen instead
+- Hold Caps Lock to click links without leaving the pen; the mouse wheel keeps scrolling
+- A toolbar you can move or shrink, and a settings page listing every page with saved ink
 
-## Development
+## Install
 
-Node.js 22 or later.
+ScrollPen isn't on the Chrome Web Store yet. Until it is, install it from the zip:
 
-```powershell
-npm install
-npx playwright install chromium
-npm run ext:build      # -> extensions/scrollpen/dist (load it via chrome://extensions > Load unpacked)
-npm run ext:watch      # rebuild on change (with source maps)
-npm test               # build + all Chrome tests
-npm run sandbox        # a Chromium window with ScrollPen and the test pages, to try by hand
-npm run typecheck
-npm run ext:pack       # -> release/scrollpen-<version>.zip (Chrome Web Store) and
-                       #    release/ScrollPen-for-friends-<version>.zip (to share; steps in share/HOW TO INSTALL.txt)
-npm run store:screenshots
-```
+1. Get `ScrollPen-for-friends-<version>.zip` and unzip it (right-click → **Extract All…**).
+2. Move the `ScrollPen` folder somewhere it can stay, such as Documents.
+3. In Chrome, open `chrome://extensions` and turn on **Developer mode** (top right).
+4. Click **Load unpacked** and choose the `ScrollPen` folder.
+5. Click the puzzle-piece icon next to the address bar and pin **ScrollPen**.
 
-Publishing: see [store/PUBLISHING.md](store/PUBLISHING.md).
+The full steps, including updating and removing, are in
+[share/HOW TO INSTALL.txt](share/HOW%20TO%20INSTALL.txt) (also inside the zip).
+
+## How to use
+
+Click the ScrollPen button or press **Alt+Shift+D** on any page and draw. Press **Esc** to use
+the page normally again; click **X** on the toolbar to close it (your ink stays).
+
+| Key | Action | Key | Action |
+|---|---|---|---|
+| P | Pen | W | Whiteboard |
+| H | Highlighter | K | Blackboard |
+| L | Laser pointer | 1 – 9 | Colours |
+| E | Eraser | [ ] | Smaller / bigger |
+| I | Line | Ctrl+Z / Ctrl+Y | Undo / redo |
+| A | Arrow | Delete | Clear the page |
+| R | Rectangle | Ctrl+↑ / ↓ | Nudge ink up / down |
+| O | Ellipse | Shift (while drawing a shape) | Straight lines, squares, circles |
+| T | Text (Ctrl+Enter or Esc to finish) | Hold Caps Lock | Click the page without leaving the pen |
+
+Shortcuts that work with the toolbar closed (screenshot, hide ink, clear, follow scrolling)
+can be changed at `chrome://extensions/shortcuts`.
+
+ScrollPen can't draw on Chrome's own pages (such as `chrome://` pages and the Chrome Web Store).
 
 ## Privacy
 
-No servers, accounts or analytics. Ink and settings live in `chrome.storage.local` in the
-user's Chrome profile and can be deleted from the settings page. See
+No account, no servers, no analytics, no ads. ScrollPen never sends anything anywhere. Your
+ink and settings are saved only in your Chrome profile on your computer, and you can delete
+them from ScrollPen's settings page at any time. Full policy:
 [store/privacy-policy.md](store/privacy-policy.md).
+
+## For developers
+
+Requires Node.js 22 or later.
+
+```powershell
+npm install
+npm run ext:build      # -> extensions/scrollpen/dist (load it via chrome://extensions > Load unpacked)
+npm run ext:watch      # rebuild on every change
+npm run typecheck
+npm run ext:pack       # -> release/scrollpen-<version>.zip            (for the Chrome Web Store)
+                       #    release/ScrollPen-for-friends-<version>.zip (to share)
+```
+
+```
+extensions/scrollpen/
+  src/ink/            the drawing layer: toolbar, tools, rendering, saving
+  src/background.ts   toolbar button, shortcuts, screenshots, opening PDFs in the viewer
+  src/pdf/            ScrollPen's PDF viewer (pdf.js, runs locally)
+  src/options/        the settings page
+  scripts/            icon drawing and zip packing
+share/                install steps that go inside the friends zip
+store/                Chrome Web Store listing, privacy policy and publishing steps
+```
+
+To release a new version, raise `version` in both `extensions/scrollpen/manifest.json` and
+`extensions/scrollpen/package.json`, then run `npm run ext:pack`. Publishing on the Chrome
+Web Store: see [store/PUBLISHING.md](store/PUBLISHING.md).

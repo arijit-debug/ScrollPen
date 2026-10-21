@@ -4,18 +4,13 @@
   "private": true,
   "description": "ScrollPen: a Chrome extension for drawing on web pages and PDFs, with ink that stays on the page",
   "workspaces": [
-    "extensions/*",
-    "tests/*"
+    "extensions/*"
   ],
   "scripts": {
     "ext:build": "npm run build -w @scrollpen/extension",
     "ext:watch": "npm run watch -w @scrollpen/extension",
     "ext:pack": "npm run pack -w @scrollpen/extension",
     "ext:icons": "npm run icons -w @scrollpen/extension",
-    "test": "npm run ext:build && npm test -w @scrollpen/e2e-chrome",
-    "test:chrome": "npm run test",
-    "sandbox": "npm run ext:build && npm run sandbox -w @scrollpen/e2e-chrome",
-    "store:screenshots": "npm run ext:build && npm run screenshots -w @scrollpen/e2e-chrome",
     "typecheck": "npm run typecheck -w @scrollpen/extension"
   },
   "engines": {

@@ -19,3 +19,6 @@ release/
 .env
 .env.*
 .env*.local
+
+# Local-only test suite and its tools (kept on the developer PC, not published)
+/tests/

@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   extension:
-    name: Extension build + Chrome tests
+    name: Build and check the extension
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,13 +26,6 @@ jobs:
           current=$(node -p "require('pdfjs-dist/package.json').version")
           latest=$(npm view pdfjs-dist version)
           if [ "$current" != "$latest" ]; then echo "::error::pdfjs-dist $current is installed, $latest is out"; exit 1; fi
-      - run: npx playwright install --with-deps chromium
-      - run: npm run typecheck
       - run: npm audit --audit-level=low
-      - run: xvfb-run -a npm test
+      - run: npm run typecheck
       - run: npm run ext:pack
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-report
-          path: tests/e2e-chrome/report

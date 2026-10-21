@@ -12,20 +12,27 @@ ScrollPen is a Chrome extension (Manifest V3) for drawing on web pages and PDFs,
 
 ## Commands
 
-The shell is PowerShell on Windows (Bash tool also available). Root is an npm workspace (`extensions/*`, `tests/*`).
+The shell is PowerShell on Windows (Bash tool also available). Root is an npm workspace (`extensions/*`).
 
 ```powershell
-npm install; npx playwright install chromium
+npm install
 npm run ext:build          # bundle to extensions/scrollpen/dist (esbuild); ext:watch adds source maps
-npm test                   # build + Playwright tests (tests/e2e-chrome)
 npm run typecheck
 npm run ext:pack           # release/scrollpen-<version>.zip (Web Store) + release/ScrollPen-for-friends-<version>.zip (load unpacked, with share/HOW TO INSTALL.txt)
-npm run store:screenshots  # release/store/*.png, 1280x800, drawn by the real extension
-npm run sandbox            # headed Chromium with the extension + fixture pages
 npm run ext:icons          # regenerate icons/*.png (scripts/make-icons.mjs, no deps)
 ```
 
-Single test: `cd tests/e2e-chrome; npx playwright test -g "eraser"`.
+**Tests are local-only:** the user asked to keep testing out of GitHub, so `tests/` is gitignored and lives only on the developer PC (it was in git history up to `c3b81b7`). It is a standalone npm package (own `node_modules`, not a workspace). Always run it after changes:
+
+```powershell
+npm run ext:build
+cd tests/e2e-chrome; npm install; npx playwright install chromium   # first time only
+npx playwright test                     # all tests; single: npx playwright test -g "eraser"
+node store-screenshots.mjs              # release/store/*.png, 1280x800, drawn by the real extension
+node sandbox.mjs                        # headed Chromium with the extension + fixture pages
+```
+
+CI (`.github/workflows/ci.yml`) only builds, typechecks, audits and checks pdf.js is current; it does not run the tests.
 
 Release: bump `version` in both `extensions/scrollpen/manifest.json` and its `package.json`, then `npm run ext:pack`; the user uploads the zip (steps in `store/PUBLISHING.md`).
 
@@ -53,7 +60,7 @@ Toolbar button / `_execute_action` (Alt+Shift+D) → `toggle` message to the tab
 ### PDFs (`src/pdf/`)
 `.pdf` URLs (http/https/file) are redirected to `pdf/viewer.html#<url>` when `settings.openPdfs`; Back shows Chrome's viewer once (`chrome.storage.session` key `pdf-native:<tabId>`). The viewer only loads http/https/file, renders with pdf.js 6 (pass bytes as `Uint8Array`; a bare ArrayBuffer reads as empty), no scripting/XFA, under the extension CSP (`script-src 'self'`); pages are laid out once at load so ink never moves. Keep `pdfjs-dist` current (CI fails when it's behind). An empty response means a download manager grabbed the file; the viewer says so.
 
-### Tests (`tests/e2e-chrome`)
+### Tests (`tests/e2e-chrome`, local-only)
 Playwright **bundled Chromium** (branded Chrome 137+ ignores `--load-extension`), fixture pages on loopback. Tests draw with the real mouse in green (`#00C853`, set via storage in the fixture) and check screen pixels (`inkNear`, pngjs) plus saved storage. Chrome shortcuts can't be pressed from tests; `command()` sends the same message. On this PC Internet Download Manager intercepts `.pdf` downloads even from 127.0.0.1 (answers 204), so the PDF test uses `fixtures/sample.pdfdata` (same bytes; `support/make-pdf.mjs` writes both).
 
 ## Features (parity checklist with the old app)
