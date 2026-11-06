@@ -50,6 +50,8 @@ Layers (`Item.layer`, see `types.ts`):
 
 Input: a fixed full-viewport `.capture` div takes pointer events only while drawing (`active`); pointer capture, coalesced events, pen pressure, pen eraser button (buttons & 32). Wheel over the capture layer scrolls the page natively; inner scrollers are scrolled by hand (`onWheel`). The hold-to-click-through key sets `.through` (pointer-events none). Keyboard shortcuts are a window capture-phase listener active only while drawing. Text opens a textarea on pointer **up** (pointer down moves focus and would close it).
 
+Consent: nothing is loaded or saved until `settings.inkStorage` is `save`; `ask` (default) shows the in-product disclosure (`src/ink/disclosure.ts`, same text on the options page and its install-time `#welcome` view) the first time drawing would start; `tab` keeps ink in the tab only. Keep `disclosure.ts`, the options "Your data" table, `store/privacy-policy.md` and the Privacy-tab answers in `store/listing.md` in step whenever stored data changes.
+
 Model: `items` plus undo/redo of `Op {add, remove}` (undo swaps them); nudging and erasing produce new ids so `renderAll` (keyed by id) re-renders. Saves are debounced to `chrome.storage.local` key `ink:<docKey>` (`docKey` = origin+path+query; `pdf:<url>` in the viewer); `storage.onChanged` adopts saves from other tabs/the settings page (own saves are recognised by `updated` timestamp set before saving). URL changes in single-page apps are polled (`checkUrl`). Everything read from storage goes through `sanitizeItems`/`sanitizeSettings`.
 
 Rendering (`render.ts`): DOM calls only (never markup strings; text via `textContent`). Pen strokes are perfect-freehand outlines; highlighter is a stroked path at 0.35 opacity; shapes are SVG primitives.

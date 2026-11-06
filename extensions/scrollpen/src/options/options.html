@@ -43,6 +43,19 @@
     .page .url { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .page .actions { grid-row: 1 / span 2; grid-column: 2; display: flex; gap: 6px; align-items: center; }
     .empty { color: var(--muted); padding: 12px 0; }
+    a { color: var(--accent); }
+    .callout { margin-top: 20px; padding: 16px 20px; border-color: var(--accent); }
+    .callout h2.inline { text-transform: none; letter-spacing: 0; font-size: 17px; color: var(--fg); margin: 0 0 8px; }
+    .callout ol, .callout ul { margin: 0 0 10px; padding-left: 22px; }
+    .callout p { margin: 0 0 8px; }
+    .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 4px; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+    .hint { color: var(--muted); font-size: 12.5px; }
+    .facts { border-top: 1px solid var(--border); padding: 12px 0 4px; font-size: 13.5px; }
+    .facts p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; margin: 4px 0 12px; font-size: 13px; }
+    th, td { text-align: left; vertical-align: top; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; }
     .footer { display: flex; justify-content: space-between; align-items: center; margin-top: 28px; color: var(--muted); font-size: 12.5px; }
     @media (max-width: 560px) {
       .row { flex-wrap: wrap; }
@@ -56,6 +69,25 @@
 <main>
   <h1>ScrollPen</h1>
   <p class="lead">Draw on any web page or PDF in Chrome. Click the ScrollPen button in the toolbar, or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>.</p>
+
+  <section id="welcome" class="callout" hidden>
+    <h2 class="inline">Welcome! Start in three steps</h2>
+    <ol>
+      <li>Click the puzzle-piece icon to the right of Chrome's address bar and pin <b>ScrollPen</b>.</li>
+      <li>Open any web page and click the ScrollPen button (or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>).</li>
+      <li>Draw. Scroll as usual: your ink stays on the page. Press <kbd>Esc</kbd> to use the page normally again.</li>
+    </ol>
+    <p class="hint">Optional, for PDFs and pictures saved on your computer: on <b>chrome://extensions</b>, open ScrollPen's
+      <b>Details</b> and turn on <b>Allow access to file URLs</b>.</p>
+  </section>
+
+  <section id="consent" class="callout" hidden>
+    <h2 class="inline" id="consentTitle"></h2>
+    <p id="consentIntro"></p>
+    <ul id="consentItems"></ul>
+    <p class="hint" id="consentNever"></p>
+    <div class="buttons"><button class="primary" id="consentSave"></button><button id="consentTab"></button></div>
+  </section>
 
   <h2>Drawing</h2>
   <section>
@@ -120,18 +152,48 @@
     </div>
   </section>
 
+  <h2>Your data</h2>
+  <section>
+    <div class="row">
+      <div class="text"><div>Save my ink on this computer</div><div class="hint" id="inkStorageHint"></div></div>
+      <div class="chips" id="inkStorage"></div>
+    </div>
+    <div class="facts">
+      <p><b>Where it is kept:</b> in Chrome's storage for ScrollPen, in this Chrome profile, on this computer only.
+        It is not synced to your Google account or to any other device, and removing ScrollPen deletes all of it.</p>
+      <table>
+        <thead><tr><th>What</th><th>When</th><th>How long</th></tr></thead>
+        <tbody>
+          <tr><td>Your ink: drawings, shapes and the text you write</td><td>Only if saving is on</td><td>Until you delete it</td></tr>
+          <tr><td>The full address of each page you draw on (including any part after "?") and its title</td><td>Only if saving is on</td><td>Until you delete it</td></tr>
+          <tr><td>When you last drew on that page</td><td>Only if saving is on</td><td>Until you delete it</td></tr>
+          <tr><td>Your settings: tool, colours, sizes, toolbar position, the choices on this page</td><td>Always</td><td>Until you reset them</td></tr>
+          <tr><td>The address of a PDF you chose to open in Chrome's own viewer (so Back works)</td><td>Only then</td><td>Until that tab closes</td></tr>
+        </tbody>
+      </table>
+      <p><b>Never sent anywhere.</b> ScrollPen has no servers, no account, no analytics, no ads and no tracking. It does not
+        read or keep the content of the pages you visit.</p>
+      <p><b>Screenshots</b> are taken only when you click the camera button or use its shortcut, and go to your Downloads folder.</p>
+      <p><b>PDFs:</b> to show a PDF you open, ScrollPen's viewer loads it from the site (or the file on your computer) it came
+        from, the same way Chrome would, including your sign-in to that site. The PDF is only displayed, never sent anywhere else.</p>
+    </div>
+    <div class="row">
+      <div class="text hint">See exactly what ScrollPen has stored, as a file you can open in any text editor.</div>
+      <button id="exportData">Download all my ScrollPen data</button>
+    </div>
+  </section>
+
   <h2>Pages with saved ink</h2>
   <section id="pages"></section>
   <p class="footer" style="margin-top: 8px"><span id="pageCount"></span><button class="danger" id="deleteAll">Delete all saved ink</button></p>
 
-  <h2>Privacy</h2>
-  <section>
-    <p>Everything stays on this computer, in this Chrome profile. ScrollPen has no account, no servers and no analytics,
-      and sends nothing anywhere. Your ink and the addresses of the pages you drew on are saved only so your ink is
-      there when you come back; delete them here at any time. Removing ScrollPen deletes all of it.</p>
-  </section>
-
-  <div class="footer"><span id="version"></span><button id="resetSettings">Reset all settings</button></div>
+  <div class="footer">
+    <span><span id="version"></span> ·
+      <a href="https://github.com/arijit-debug/ScrollPen/blob/main/store/privacy-policy.md" target="_blank" rel="noopener">Privacy policy</a> ·
+      <a href="https://github.com/arijit-debug/ScrollPen" target="_blank" rel="noopener">Source code</a> ·
+      <a href="../THIRD_PARTY_NOTICES.txt" target="_blank">Licences</a></span>
+    <button id="resetSettings">Reset all settings</button>
+  </div>
 </main>
 <script src="options.js"></script>
 </body>

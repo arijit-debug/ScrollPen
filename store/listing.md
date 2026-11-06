@@ -43,9 +43,11 @@ QUICK TO USE
 • Move or shrink the toolbar to keep it out of the way
 
 PRIVATE BY DESIGN
-• Everything stays on your computer, in your Chrome profile
-• No account, no servers, no analytics, no ads
-• Ink is saved locally so it's there when you return; delete any of it from ScrollPen's settings at any time
+• You choose whether your ink is saved; nothing is saved until you answer
+• If you save it, it stays on your computer, in your Chrome profile, and nothing is ever sent anywhere
+• No account, no servers, no analytics, no ads, no tracking
+• The settings page shows exactly what is stored, and lets you download or delete all of it
+• Free and open source: https://github.com/arijit-debug/ScrollPen
 ```
 
 **Icon:** `extensions/scrollpen/icons/icon128.png`
@@ -57,6 +59,8 @@ PRIVATE BY DESIGN
 4. `4-whiteboard.png`
 
 **Small promo tile** (440×280): optional; skip it.
+
+**Official URL / Homepage URL:** `https://github.com/arijit-debug/ScrollPen` · **Support URL:** `https://github.com/arijit-debug/ScrollPen/issues`
 
 ## Privacy tab
 
@@ -78,12 +82,34 @@ ScrollPen lets people draw and write on web pages and PDFs in Chrome, with the i
 
 **Are you using remote code?** No, I am not using remote code.
 
-**Data usage:** ScrollPen keeps everything on the user's computer and sends nothing anywhere, so it does not collect user data. Leave every data type unticked, then tick the three certifications:
+**Data usage:** Google's policy says data an extension handles must be disclosed **even when it is only stored on the user's computer** ([User Data FAQ](https://developer.chrome.com/docs/webstore/program-policies/user-data-faq), question 3). So tick exactly these, matching what ScrollPen stores (see the table in `store/privacy-policy.md`):
+
+| Box | Tick? | Why |
+|---|---|---|
+| Personally identifiable information | No | No name, email, address or ID is handled |
+| Health information | No | |
+| Financial and payment information | No | |
+| Authentication information | No | No passwords or sign-in data |
+| Personal communications | No | |
+| Location | No | |
+| **Web history** | **Yes** | With the user's consent, ScrollPen saves the address, title and last-drawn time of pages the user draws on |
+| User activity | No | ScrollPen does not log clicks, keystrokes, mouse movement or scrolling; it only turns the user's own drawing into ink |
+| **Website content** | **Yes** | Screenshots the user asks for capture the visible page (saved to Downloads); page titles are kept with saved ink |
+
+Then tick all three certifications:
 - I do not sell or transfer user data to third parties, outside of the approved use cases
 - I do not use or transfer user data for purposes that are unrelated to my item's single purpose
 - I do not use or transfer user data to determine creditworthiness or for lending purposes
 
-**Privacy policy URL:** the public link to `store/privacy-policy.md` (see PUBLISHING.md, step 4).
+**In-product disclosure and consent** (required by the [disclosure policy](https://developer.chrome.com/docs/webstore/program-policies/disclosure-requirements), already built in): the first time ScrollPen opens, it asks "Save your ink on this computer?" and saves nothing until the user answers; installing also opens a welcome page with the same question and a full table of what is stored.
+
+**Privacy policy URL:** `https://github.com/arijit-debug/ScrollPen/blob/main/store/privacy-policy.md` (works once the repository is public).
+
+## Test instructions tab (for Google's reviewer)
+
+```
+No account or sign-in is needed. After installing, a welcome page opens. On any website, click the ScrollPen toolbar button (or press Alt+Shift+D), answer the "Save your ink on this computer?" question, then draw with the mouse and scroll: the ink stays on the page. ScrollPen's settings (right-click the button > Options) list everything it stores, with buttons to download or delete it. PDF links open in ScrollPen's own PDF viewer so they can be drawn on.
+```
 
 ## Distribution tab
 

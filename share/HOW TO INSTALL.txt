@@ -37,6 +37,9 @@ USE IT
 
 - Open any website and click the ScrollPen button (or press Alt+Shift+D).
   A toolbar appears on the right. Draw!
+- The first time, ScrollPen asks "Save your ink on this computer?". Choose
+  "Save" to keep your ink for next time, or "Don't save" to keep it only until
+  you close the tab. Nothing is saved before you choose.
 - Scroll with the mouse wheel as usual; the ink moves with the page.
 - Press Esc (or the arrow button at the top of the toolbar) to use the page
   normally again. Click the X on the toolbar to close it; your ink stays.

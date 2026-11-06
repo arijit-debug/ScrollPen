@@ -33,7 +33,18 @@ export type SizeKey = 'pen' | 'highlighter' | 'shape' | 'text';
 export const CLICK_THROUGH_KEYS = ['CapsLock', '`', 'F8', 'RCtrl', ''] as const;
 export type ClickThroughKey = (typeof CLICK_THROUGH_KEYS)[number];
 
+/**
+ * The user's answer to "save my ink on this computer?", asked in the product before
+ * anything is stored (Chrome Web Store user data policy):
+ * - ask: not answered yet; nothing is saved
+ * - save: ink, page address and title are kept in this Chrome profile
+ * - tab: ink lives only in the open tab and is gone when it closes; nothing is saved
+ */
+export const INK_STORAGE = ['ask', 'save', 'tab'] as const;
+export type InkStorage = (typeof INK_STORAGE)[number];
+
 export interface Settings {
+  inkStorage: InkStorage;
   tool: Tool;
   color: string;
   palette: string[];
@@ -54,6 +65,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  inkStorage: 'ask',
   tool: 'pen',
   color: '#E53935',
   palette: ['#E53935', '#FB8C00', '#FDD835', '#43A047', '#1E88E5', '#8E24AA', '#212121', '#FFFFFF', '#00ACC1'],
@@ -103,6 +115,7 @@ export function sanitizeSettings(raw: unknown): Settings {
   const bool = (k: 'fill' | 'documentMode' | 'startActive' | 'openPdfs' | 'toolbarMinimized') =>
     typeof s[k] === 'boolean' ? (s[k] as boolean) : d[k];
   return {
+    inkStorage: INK_STORAGE.includes(s.inkStorage as InkStorage) ? (s.inkStorage as InkStorage) : d.inkStorage,
     tool: TOOLS.includes(s.tool as Tool) ? (s.tool as Tool) : d.tool,
     color: isColor(s.color) ? s.color : d.color,
     palette: palette.length ? palette : d.palette,

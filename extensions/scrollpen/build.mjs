@@ -1,6 +1,6 @@
 // Bundles the extension into dist/ (load that folder via chrome://extensions > Load unpacked).
 import { build, context } from 'esbuild';
-import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +24,30 @@ cpSync(join(pdfjs, 'build/pdf.worker.min.mjs'), join(dist, 'pdf/pdf.worker.min.m
 for (const dir of ['cmaps', 'standard_fonts', 'wasm', 'iccs']) {
   if (existsSync(join(pdfjs, dir))) cpSync(join(pdfjs, dir), join(dist, 'pdf', dir), { recursive: true });
 }
+
+// Licences of the open-source code bundled into ScrollPen (their terms require shipping them).
+const freehand = join(root, '..', '..', 'node_modules', 'perfect-freehand');
+writeFileSync(
+  join(dist, 'THIRD_PARTY_NOTICES.txt'),
+  [
+    'ScrollPen includes the following open-source software.',
+    '',
+    'pdf.js (https://github.com/mozilla/pdf.js): Apache License 2.0, full text below.',
+    'Its character maps, standard fonts, image decoders and colour profiles in pdf/cmaps, pdf/standard_fonts,',
+    'pdf/wasm and pdf/iccs come with their own licence files (LICENSE*) in those folders.',
+    '',
+    'perfect-freehand (https://github.com/steveruizok/perfect-freehand): MIT License, full text below.',
+    '',
+    '='.repeat(78),
+    'pdf.js',
+    '='.repeat(78),
+    readFileSync(join(pdfjs, 'LICENSE'), 'utf8'),
+    '='.repeat(78),
+    'perfect-freehand',
+    '='.repeat(78),
+    readFileSync(join(freehand, 'LICENSE'), 'utf8'),
+  ].join('\n'),
+);
 
 const common = {
   outdir: dist,

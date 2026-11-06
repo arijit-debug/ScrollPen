@@ -5,6 +5,7 @@
 // document coordinates, so the browser scrolls and zooms it together with the content
 // (no lag, nothing to keep in sync). Ink on an inner scrolling element (a chat pane, a
 // code viewer) is anchored to that element and follows its scroll.
+import { DISCLOSURE } from './disclosure';
 import { hitItem } from './geometry';
 import { icon, type IconName } from './icons';
 import { renderItem, svg } from './render';
@@ -174,6 +175,7 @@ class Overlay {
   private swatch!: HTMLSpanElement;
   private hideButton!: HTMLButtonElement;
   private pinButton!: HTMLButtonElement;
+  private consentEl: HTMLDivElement | null = null;
   private clickThrough = false;
 
   private layers = new Map<string, Layer>();
@@ -283,11 +285,14 @@ class Overlay {
   private onStorage = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
     if (area !== 'local' || !this.alive()) return;
     if (changes[SETTINGS_KEY]) {
+      const before = this.settings.inkStorage;
       this.settings = sanitizeSettings(changes[SETTINGS_KEY].newValue);
+      // The saving choice was made elsewhere (another tab, the settings page).
+      if (before !== this.settings.inkStorage) this.onInkStorageChanged(before);
       this.refresh();
     }
     const change = changes[inkKey(this.docKey)];
-    if (!change) return;
+    if (!change || this.settings.inkStorage !== 'save') return;
     // The same page open in another tab saved, or saved ink was deleted in the options.
     const saved = sanitizeSaved(change.newValue, this.docKey);
     if (saved ? saved.updated === this.lastSaved : !this.items.length) return;
@@ -302,7 +307,8 @@ class Overlay {
 
   private async loadPage(): Promise<void> {
     const key = this.docKey;
-    const saved = await loadInk(key);
+    // Saved ink is read only once the user agreed to saving it.
+    const saved = this.settings.inkStorage === 'save' ? await loadInk(key) : null;
     if (key !== this.docKey || this.destroyed) return;
     this.items = saved?.items ?? [];
     this.lastSaved = saved?.updated ?? 0;
@@ -342,10 +348,71 @@ class Overlay {
     clearTimeout(this.saveTimer);
     if (!this.savePending || !chrome.runtime?.id) return;
     this.savePending = false;
+    // Nothing is stored unless the user chose "save" (ink then stays in this tab only).
+    if (this.settings.inkStorage !== 'save') return;
     const updated = Date.now();
     this.lastSaved = updated;
     void saveInk(this.docKey, document.title, this.items, updated).catch(() => this.toast('Could not save the ink on this page.'));
   };
+
+  /** First use: say what would be stored and let the user choose before anything is saved. */
+  private showConsent(): void {
+    if (this.consentEl) return;
+    const panel = this.div('consent');
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-labelledby', 'sp-consent-title');
+    const title = document.createElement('h2');
+    title.id = 'sp-consent-title';
+    title.textContent = DISCLOSURE.title;
+    const intro = document.createElement('p');
+    intro.textContent = DISCLOSURE.intro;
+    const list = document.createElement('ul');
+    for (const item of DISCLOSURE.items) {
+      const li = document.createElement('li');
+      li.textContent = item;
+      list.append(li);
+    }
+    const never = document.createElement('p');
+    never.textContent = DISCLOSURE.never;
+    const actions = this.div('actions');
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.className = 'primary';
+    save.textContent = DISCLOSURE.save;
+    save.addEventListener('click', () => this.alive() && this.chooseInkStorage('save'));
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.textContent = DISCLOSURE.tab;
+    tab.addEventListener('click', () => this.alive() && this.chooseInkStorage('tab'));
+    actions.append(save, tab);
+    panel.append(title, intro, list, never, actions);
+    // Keys typed here belong to the panel, not to the page or the drawing shortcuts.
+    panel.addEventListener('keydown', (e) => e.stopPropagation());
+    this.consentEl = panel;
+    this.root.append(panel);
+    save.focus({ preventScroll: true });
+  }
+
+  private chooseInkStorage(choice: 'save' | 'tab'): void {
+    const before = this.settings.inkStorage;
+    this.settings = { ...this.settings, inkStorage: choice };
+    clearTimeout(this.settingsTimer);
+    void saveSettings(this.settings).catch(() => undefined);
+    this.onInkStorageChanged(before);
+    this.toast(choice === 'save' ? 'Your ink will be saved on this computer.' : "Your ink won't be saved.");
+  }
+
+  private onInkStorageChanged(before: Settings['inkStorage']): void {
+    if (this.settings.inkStorage === 'ask') return;
+    if (this.consentEl) {
+      this.consentEl.remove();
+      this.consentEl = null;
+      if (this.toolbarOpen) this.setActive(true);
+    }
+    // Ink drawn before saving was turned on is saved now.
+    if (this.settings.inkStorage === 'save' && before !== 'save' && this.items.length) this.scheduleSave();
+  }
 
   private persistSettings(): void {
     clearTimeout(this.settingsTimer);
@@ -535,6 +602,8 @@ class Overlay {
 
   private closeToolbar(): void {
     this.commitText();
+    this.consentEl?.remove();
+    this.consentEl = null;
     this.toolbarOpen = false;
     this.toolbar.classList.remove('open');
     this.closePopover();
@@ -559,6 +628,11 @@ class Overlay {
 
   private setActive(on: boolean): void {
     if (!on) this.commitText();
+    // Drawing starts only after the saving question is answered.
+    if (on && this.toolbarOpen && this.settings.inkStorage === 'ask') {
+      this.showConsent();
+      on = false;
+    }
     this.active = on && this.toolbarOpen;
     if (!this.active) {
       this.drag = null;

@@ -1,56 +1,97 @@
 # Publishing ScrollPen on the Chrome Web Store
 
-Step by step, for a first time. Plan on about an hour, plus Google's review (usually a few
-days; extensions that can run on every website, like ScrollPen, can take a little longer).
+For a first-timer, step by step. ScrollPen is free, so there's nothing to set up for payments.
+Plan on about an hour of work, then Google's review: usually a few business days, but
+ScrollPen runs on every website, which triggers a closer manual review that can take longer,
+sometimes a couple of weeks.
 
-## 1. Make the upload file and the screenshots
+Already done for you in the extension: Manifest V3, no remote code, only the permissions it
+needs (each one justified in `listing.md`), a privacy policy, the in-product "Save your ink on
+this computer?" consent Google requires, a settings page that shows and exports everything
+stored, store screenshots, and the licences of the open-source code it includes.
+
+## 1. Make your GitHub repository public
+
+The privacy policy link and the "Source code" link inside ScrollPen point to GitHub, so the
+repository must be public before you submit.
+
+1. Decide on a licence (see the note at the end of this file) and add it first if you want one.
+2. Go to https://github.com/arijit-debug/ScrollPen → **Settings** → scroll to the bottom ("Danger Zone") → **Change visibility** → **Make public**, and confirm.
+3. Check that this link opens when you're signed out (for example in an Incognito window):
+   https://github.com/arijit-debug/ScrollPen/blob/main/store/privacy-policy.md
+
+Good to know: once public, anyone can see every past commit, including the email address the
+commits were made with (205127749+arijit-debug@users.noreply.github.com). No passwords or keys were ever committed.
+
+## 2. Make the upload file and the screenshots
 
 In PowerShell, in the `E:\ScrollPen` folder:
 
 ```powershell
-npm run ext:pack            # -> release\scrollpen-1.0.0.zip   (the file you upload)
-npm run store:screenshots   # -> release\store\*.png           (4 screenshots)
+npm run ext:pack     # -> release\scrollpen-1.0.0.zip   (the file you upload)
 ```
 
-## 2. Try it in your own Chrome first
-
-1. Open `chrome://extensions` in Chrome.
-2. Turn on **Developer mode** (top right).
-3. Click **Load unpacked** and choose the folder `E:\ScrollPen\extensions\scrollpen\dist`.
-4. Open any website, click the puzzle-piece icon in Chrome's toolbar, pin **ScrollPen**, and click it (or press Alt+Shift+D). Draw, scroll, reload the page.
-5. For PDFs and pictures on your computer: on `chrome://extensions`, click **Details** under ScrollPen and turn on **Allow access to file URLs**.
-
-When you're happy, remove this test copy (click **Remove**) before installing the published one, so you don't have two.
+The 4 screenshots are in `release\store\` (Claude can regenerate them any time).
 
 ## 3. Create your developer account (one time, US$5)
 
-1. Go to https://chrome.google.com/webstore/devconsole and sign in with the Google account you want to publish with.
-2. Accept the developer agreement and pay the one-time US$5 registration fee.
-3. Fill in the account page: a publisher name (shown in the store) and a contact email, which Google verifies.
+1. **Turn on 2-Step Verification** for the Google account you'll publish with
+   (https://myaccount.google.com/security). Google requires it for publishing.
+   Tip: a separate Google account just for publishing keeps your personal Gmail private.
+2. Go to https://chrome.google.com/webstore/devconsole and sign in.
+3. Accept the developer agreement and pay the one-time **US$5** fee.
+4. On the **Account** page:
+   - **Publisher name:** what users see, e.g. your name or "ScrollPen".
+   - **Contact email:** Google sends a link to verify it. Users may see it, so you can use a separate address.
+   - **Trader / non-trader declaration:** choose **non-trader**. ScrollPen is free and not part of a business. (Traders must publish their address and phone number for EU users.)
 
-## 4. Put the privacy policy online
+## 4. Upload and fill in the listing
 
-The store needs a public web link to a privacy policy. The simplest free way:
+1. In the Developer Dashboard click **New item** and upload `release\scrollpen-1.0.0.zip`.
+   You'll likely see a notice that ScrollPen's site access means an in-depth review. That's
+   expected and fine.
+2. Fill in each tab using `store\listing.md` (copy and paste):
+   - **Store listing:** description, category (Productivity → Tools), language, the 128×128
+     icon (`extensions\scrollpen\icons\icon128.png`), the 4 screenshots, homepage and support URLs.
+   - **Privacy:** single purpose; one justification per permission; "No, I am not using remote
+     code"; the data usage boxes **exactly as the table in listing.md says** (tick *Web history*
+     and *Website content*, plus the three certifications); the privacy policy URL.
+   - **Test instructions:** paste the text from listing.md (no account is needed).
+   - **Distribution:** Free, **Public**, all regions. (Pick **Unlisted** instead if you want only
+     people with the link to find it at first.)
+3. Click **Submit for review**. You can tick "publish automatically after approval".
 
-1. Open `store\privacy-policy.md`, replace `[YOUR CONTACT EMAIL]` with the email you want people to use, and copy all of the text.
-2. Go to https://gist.github.com (signed in to GitHub), paste it, name the file `privacy-policy.md`, and click **Create public gist**.
-3. Copy the gist's address; that's your privacy policy URL.
+## 5. While you wait, and after
 
-(Your ScrollPen repository is private, so a link into it wouldn't work for others.)
-
-## 5. Upload
-
-1. In the Developer Dashboard click **New item** (or **Add new item**) and upload `release\scrollpen-1.0.0.zip`.
-2. Fill in the tabs using `store\listing.md`: copy each part into the matching box.
-   - **Store listing**: description, category, language, icon, screenshots.
-   - **Privacy**: single purpose, a justification for each permission, "no remote code", data usage and the privacy policy URL.
-   - **Distribution**: Free, Public (or Unlisted to share it only with a link first), all regions.
-3. Click **Submit for review**.
-
-Google emails you when it's approved or if they need changes. Once approved, people can install ScrollPen from its store page with one click, and Chrome keeps it updated automatically.
+- Google emails you when it's approved, or explains what to change if it's rejected. Common
+  reasons are a permission justification they don't accept or a listing that doesn't match
+  what the extension does; send Claude the email and it will fix it.
+- Once published, people install ScrollPen with one click from its store page, and Chrome
+  updates it for them automatically.
+- To get users: share the store link in your WhatsApp groups, with classmates and teachers, on
+  Reddit communities about studying or note-taking, and ask happy users for a review. Feedback
+  can come in through GitHub Issues.
 
 ## Updating later
 
-1. Raise the version number in **both** `extensions\scrollpen\manifest.json` and `extensions\scrollpen\package.json` (for example `1.0.0` → `1.0.1`). The store refuses an upload with the same version.
+1. Raise the version in **both** `extensions\scrollpen\manifest.json` and
+   `extensions\scrollpen\package.json` (for example `1.0.0` → `1.0.1`). The store refuses an
+   upload with the same version.
 2. `npm run ext:pack`
-3. In the Developer Dashboard open ScrollPen → **Package** → **Upload new package**, then **Submit for review**.
+3. Dashboard → ScrollPen → **Package** → **Upload new package** → **Submit for review**.
+4. If an update changes what ScrollPen stores, update `privacy-policy.md`, the Privacy tab
+   answers and the in-product disclosure (`src/ink/disclosure.ts`) first: Google requires
+   users to be told inside the extension before new data practices start.
+
+## Note: a licence for the public repository
+
+Without a licence, a public repository is "look but don't touch": people can read the code but
+have no right to reuse it. Most free extensions use the **MIT licence** (anyone may use, copy
+and change the code, as long as they keep your copyright notice). It's your choice; ask Claude
+to add one.
+
+## Sources
+
+- Program policies and user data FAQ: https://developer.chrome.com/docs/webstore/program-policies/user-data-faq
+- Disclosure and consent requirements: https://developer.chrome.com/docs/webstore/program-policies/disclosure-requirements
+- Privacy tab fields: https://developer.chrome.com/docs/webstore/cws-dashboard-privacy

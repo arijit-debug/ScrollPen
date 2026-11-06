@@ -96,7 +96,9 @@ async function routePdf(tabId: number, url: string): Promise<void> {
 
 // PDFs already open in Chrome's viewer when ScrollPen is installed or updated would
 // otherwise stay there until reopened.
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
+  // First install: a welcome page that says how to start and what ScrollPen stores.
+  if (details.reason === 'install') void chrome.tabs.create({ url: chrome.runtime.getURL('options/options.html#welcome') });
   void chrome.tabs.query({}).then((tabs) => {
     for (const tab of tabs) if (tab.id !== undefined && tab.url && isPdfUrl(tab.url)) void routePdf(tab.id, tab.url);
   });

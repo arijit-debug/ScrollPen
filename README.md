@@ -57,10 +57,19 @@ ScrollPen can't draw on Chrome's own pages (such as `chrome://` pages and the Ch
 
 ## Privacy
 
-No account, no servers, no analytics, no ads. ScrollPen never sends anything anywhere. Your
-ink and settings are saved only in your Chrome profile on your computer, and you can delete
-them from ScrollPen's settings page at any time. Full policy:
-[store/privacy-policy.md](store/privacy-policy.md).
+No account, no servers, no analytics, no ads, no tracking. ScrollPen never sends anything
+anywhere.
+
+- **You choose:** the first time you use it, ScrollPen asks whether to save your ink on this
+  computer. Nothing is saved until you answer, and you can change it later.
+- **What is saved** (only if you said yes): your ink, plus the address, title and last-drawn
+  time of each page you draw on. It stays in your Chrome profile on your computer and is not
+  synced anywhere.
+- **See it all:** ScrollPen's settings page lists everything it stores, and can download it as
+  a file or delete it. Removing ScrollPen deletes all of it.
+
+Full details: [store/privacy-policy.md](store/privacy-policy.md). Feedback and questions:
+[GitHub Issues](https://github.com/arijit-debug/ScrollPen/issues).
 
 ## For developers
 
