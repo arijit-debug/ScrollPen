@@ -20,8 +20,8 @@ repository must be public before you submit.
 3. Check that this link opens when you're signed out (for example in an Incognito window):
    https://github.com/arijit-debug/ScrollPen/blob/main/store/privacy-policy.md
 
-Good to know: once public, anyone can see every past commit, including the email address the
-commits were made with (205127749+arijit-debug@users.noreply.github.com). No passwords or keys were ever committed.
+Good to know: once public, anyone can see every past commit, including the email address each
+commit was made with. This repository now commits with GitHub's private "noreply" address.
 
 ## 2. Make the upload file and the screenshots
 
