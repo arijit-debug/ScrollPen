@@ -2,6 +2,7 @@
   "name": "scrollpen",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "description": "ScrollPen: a Chrome extension for drawing on web pages and PDFs, with ink that stays on the page",
   "workspaces": [
     "extensions/*"

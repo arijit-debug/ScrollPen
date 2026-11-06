@@ -15,7 +15,7 @@ stored, store screenshots, and the licences of the open-source code it includes.
 The privacy policy link and the "Source code" link inside ScrollPen point to GitHub, so the
 repository must be public before you submit.
 
-1. Decide on a licence (see the note at the end of this file) and add it first if you want one.
+1. The MIT licence is already added (`LICENSE`).
 2. Go to https://github.com/arijit-debug/ScrollPen → **Settings** → scroll to the bottom ("Danger Zone") → **Change visibility** → **Make public**, and confirm.
 3. Check that this link opens when you're signed out (for example in an Incognito window):
    https://github.com/arijit-debug/ScrollPen/blob/main/store/privacy-policy.md
@@ -83,12 +83,10 @@ The 4 screenshots are in `release\store\` (Claude can regenerate them any time).
    answers and the in-product disclosure (`src/ink/disclosure.ts`) first: Google requires
    users to be told inside the extension before new data practices start.
 
-## Note: a licence for the public repository
+## Licence
 
-Without a licence, a public repository is "look but don't touch": people can read the code but
-have no right to reuse it. Most free extensions use the **MIT licence** (anyone may use, copy
-and change the code, as long as they keep your copyright notice). It's your choice; ask Claude
-to add one.
+The repository uses the MIT licence (`LICENSE`): people may use, copy and change the code as
+long as they keep the copyright notice.
 
 ## Sources
 

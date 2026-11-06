@@ -98,3 +98,10 @@ store/                Chrome Web Store listing, privacy policy and publishing st
 To release a new version, raise `version` in both `extensions/scrollpen/manifest.json` and
 `extensions/scrollpen/package.json`, then run `npm run ext:pack`. Publishing on the Chrome
 Web Store: see [store/PUBLISHING.md](store/PUBLISHING.md).
+
+## Licence
+
+ScrollPen is free and open source under the [MIT licence](LICENSE): anyone may use, copy and
+change it, as long as the copyright notice is kept. The open-source libraries it includes keep
+their own licences (pdf.js: Apache 2.0, perfect-freehand: MIT); see `THIRD_PARTY_NOTICES.txt`
+inside the extension.

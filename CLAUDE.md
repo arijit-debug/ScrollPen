@@ -7,6 +7,7 @@ ScrollPen is a Chrome extension (Manifest V3) for drawing on web pages and PDFs,
 ## Hard constraints
 
 - **Nothing leaves the user's computer.** No servers, accounts, analytics, crash reporting or remote code. Ink and settings live in `chrome.storage.local` only (not `storage.sync`). The only network fetch is the PDF viewer loading the PDF the user opened. Chrome's own Web Store auto-update is the update channel.
+- **Licence:** MIT (`LICENSE`, copyright "arijit-debug": keep the user's real name and email out of the repo).
 - **Web Store rules:** no remote code, every permission justified in `store/listing.md`; keep that file in sync when permissions change. The manifest must not have a `key` field (the store assigns the ID).
 - Feature parity with the retired desktop app was required by the user: every tool, setting and shortcut it had exists here (see "Features" below); don't drop any without asking.
 
