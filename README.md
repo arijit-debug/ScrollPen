@@ -24,7 +24,9 @@ Everything stays on your computer.
 
 ScrollPen isn't on the Chrome Web Store yet. Until it is, install it from the zip:
 
-1. Get `ScrollPen-for-friends-<version>.zip` and unzip it (right-click → **Extract All…**).
+1. Download `ScrollPen-for-friends-<version>.zip` from the
+   **[latest release](https://github.com/arijit-debug/ScrollPen/releases/latest)** (under "Assets")
+   and unzip it (right-click → **Extract All…**).
 2. Move the `ScrollPen` folder somewhere it can stay, such as Documents.
 3. In Chrome, open `chrome://extensions` and turn on **Developer mode** (top right).
 4. Click **Load unpacked** and choose the `ScrollPen` folder.

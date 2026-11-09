@@ -35,7 +35,7 @@ node sandbox.mjs                        # headed Chromium with the extension + f
 
 CI (`.github/workflows/ci.yml`) only builds, typechecks, audits and checks pdf.js is current; it does not run the tests.
 
-Release: bump `version` in both `extensions/scrollpen/manifest.json` and its `package.json`, then `npm run ext:pack`; the user uploads the zip (steps in `store/PUBLISHING.md`).
+Release: bump `version` in both `extensions/scrollpen/manifest.json` and its `package.json`, then `npm run ext:pack`; the user uploads the store zip (steps in `store/PUBLISHING.md`). The friends zip is published as a GitHub Release (`gh release create v<version> release/ScrollPen-for-friends-<version>.zip --latest`); the README links to `releases/latest`, so friends always get the newest one.
 
 ## Architecture
 
